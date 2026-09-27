@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "Trainer": {
+      "title": "Trainer",
+      "description": "Registered service provider / trainer profile, availability settings, clients, appointments, packages, and invoices.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the trainer"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the trainer"
+        },
+        "profession": {
+          "type": "string",
+          "description": "Specialty or profession of the trainer"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address of the trainer"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the trainer"
+        },
+        "standardHourlyRate": {
+          "type": "number",
+          "description": "Standard hourly rate of the trainer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Client registered by a trainer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "magicToken": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "name", "email", "magicToken"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled training session or appointment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "price": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["reserved", "delivered", "cancelled", "no-show"]
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "clientId", "serviceId", "date", "startTime", "endTime", "status"]
+    },
+    "AvailabilityBlock": {
+      "title": "AvailabilityBlock",
+      "description": "Working time block (Ad Hoc or Fixed Schedule) on the calendar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "breakStart": { "type": "string" },
+        "breakEnd": { "type": "string" },
+        "notes": { "type": "string" },
+        "slotDuration": { "type": "number" },
+        "bufferMinutes": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "date", "startTime", "endTime"]
+    },
+    "ScheduleException": {
+      "title": "ScheduleException",
+      "description": "Blocked period or vacation on the trainer's calendar.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "title": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "reason": {
+          "type": "string",
+          "enum": ["vacation", "sick", "personal", "blocked"]
+        },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "title", "startDate", "endDate", "reason"]
+    },
+    "ServiceType": {
+      "title": "ServiceType",
+      "description": "Bookable service type offered by the trainer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "name": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "description": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "color": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "name", "durationMinutes"]
+    },
+    "ServicePackage": {
+      "title": "ServicePackage",
+      "description": "Session bundle or package template offered by the trainer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "sessionCount": { "type": "number" },
+        "price": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "name", "sessionCount", "price"]
+    },
+    "ClientPackage": {
+      "title": "ClientPackage",
+      "description": "Active or redeemed package balance assigned to a client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "packageId": { "type": "string" },
+        "packageName": { "type": "string" },
+        "totalSessions": { "type": "number" },
+        "remainingSessions": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["active", "exhausted", "expired"]
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "clientId", "packageId", "totalSessions", "remainingSessions"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Chat message between trainer and client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "sender": {
+          "type": "string",
+          "enum": ["provider", "client"]
+        },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "clientId", "sender", "text", "timestamp"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Invoice issued by the trainer to a client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "sent", "paid", "cancelled"]
+        },
+        "totalAmount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "trainerId", "invoiceNumber", "clientId", "status", "totalAmount"]
+    }
+  },
+  "firestore": {
+    "/trainers/{trainerId}": {
+      "schema": { "$ref": "#/entities/Trainer" },
+      "description": "Trainer profile and workspace data keyed by Firebase Auth UID"
+    },
+    "/trainers/{trainerId}/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Clients registered by the trainer"
+    },
+    "/trainers/{trainerId}/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Appointments scheduled for the trainer"
+    },
+    "/trainers/{trainerId}/availability/{blockId}": {
+      "schema": { "$ref": "#/entities/AvailabilityBlock" },
+      "description": "Working time blocks (Ad Hoc & Fixed Schedule) for the trainer"
+    },
+    "/trainers/{trainerId}/exceptions/{exceptionId}": {
+      "schema": { "$ref": "#/entities/ScheduleException" },
+      "description": "Vacations and blocked date ranges for the trainer"
+    },
+    "/trainers/{trainerId}/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/ServiceType" },
+      "description": "Bookable services configured by the trainer"
+    },
+    "/trainers/{trainerId}/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/ServicePackage" },
+      "description": "Session bundles offered by the trainer"
+    },
+    "/trainers/{trainerId}/clientPackages/{clientPackageId}": {
+      "schema": { "$ref": "#/entities/ClientPackage" },
+      "description": "Assigned/purchased client package balances"
+    },
+    "/trainers/{trainerId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Direct and bulk chat messages between trainer and clients"
+    },
+    "/trainers/{trainerId}/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Invoices created by the trainer"
+    },
+    "/clients/{docId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Top-level client records indexed by trainerId_clientId"
+    }
+  }
+}

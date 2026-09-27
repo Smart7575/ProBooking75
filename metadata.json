@@ -1,0 +1,6 @@
+{
+  "name": "ProBooking - Service Provider Booking & Client Management",
+  "description": "Modern self-service booking, calendar availability, client management, rates, and reporting platform for independent service providers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(trainerId) {
+      return isSignedIn() && request.auth.uid == trainerId;
+    }
+
+    function isTrainerDocOwner() {
+      return isSignedIn() && resource.data.trainerId == request.auth.uid;
+    }
+
+    function isTrainerRequestOwner() {
+      return isSignedIn() && request.resource.data.trainerId == request.auth.uid;
+    }
+
+    match /trainers/{trainerId} {
+      allow read, write: if isOwner(trainerId);
+
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner(trainerId);
+      }
+    }
+
+    match /clients/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /appointments/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /availability/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /exceptions/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /services/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /packages/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /clientPackages/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /messages/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+
+    match /invoices/{docId} {
+      allow read, delete: if isTrainerDocOwner();
+      allow create, update: if isTrainerRequestOwner();
+    }
+  }
+}
