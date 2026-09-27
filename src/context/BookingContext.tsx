@@ -275,11 +275,28 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     ? `${LOCAL_STORAGE_KEY}_${currentUser.uid}`
     : LOCAL_STORAGE_KEY;
 
-  // Load initial from localStorage or defaults
+  // Load initial from localStorage or defaults (default language: 'en' unless previously chosen)
   const [role, setRole] = useState<UserRole>('provider');
   const [activeClientId, setActiveClientId] = useState<string>('cli-1');
   const [magicLinkNotification, setMagicLinkNotification] = useState<{ clientName: string; token: string } | null>(null);
-  const [language, setLanguage] = useState<AppLanguage>('en');
+  const [language, setLanguageState] = useState<AppLanguage>(() => {
+    try {
+      const savedLang = localStorage.getItem('probooking_language');
+      if (savedLang === 'en' || savedLang === 'nl') return savedLang;
+    } catch {
+      // ignore
+    }
+    return 'en';
+  });
+
+  const setLanguage = useCallback((lang: AppLanguage) => {
+    setLanguageState(lang);
+    try {
+      localStorage.setItem('probooking_language', lang);
+    } catch {
+      // ignore
+    }
+  }, []);
   const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<'connecting' | 'synced' | 'error'>('connecting');
   const [firebaseSyncError, setFirebaseSyncError] = useState<string | null>(null);
   const [isHydratedFromFirestore, setIsHydratedFromFirestore] = useState<boolean>(false);
@@ -297,16 +314,60 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setReloadTrigger((n) => n + 1);
   }, []);
 
+  const getPendingRegistration = () => {
+    try {
+      const raw = localStorage.getItem('probooking_pending_registration');
+      if (raw) {
+        return JSON.parse(raw) as {
+          name?: string;
+          profession?: string;
+          phone?: string;
+          standardHourlyRate?: number;
+          email?: string;
+          isExplicitRegister?: boolean;
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  const fallbackUserName =
+    currentUser?.displayName ||
+    (currentUser?.email ? currentUser.email.split('@')[0] : initialSettings.name);
+  const fallbackUserEmail = currentUser?.email || initialSettings.email;
+
   const [settings, setSettings] = useState<ProviderSettings>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_settings`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_settings`);
+    const pendingReg = getPendingRegistration();
+    const saved =
+      localStorage.getItem(`${userStoragePrefix}_settings`) ||
+      localStorage.getItem(`probooking_v3_${currentUser?.uid}_settings`);
+
+    if (pendingReg && (pendingReg.isExplicitRegister || pendingReg.name || pendingReg.profession)) {
+      return {
+        ...initialSettings,
+        name: pendingReg.name || fallbackUserName,
+        profession: pendingReg.profession || 'Personal Trainer & Coach',
+        email: pendingReg.email || fallbackUserEmail,
+        phone: pendingReg.phone || initialSettings.phone,
+        standardHourlyRate: pendingReg.standardHourlyRate || initialSettings.standardHourlyRate,
+        availabilityMode: 'adhoc',
+      };
+    }
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const resolvedName =
+          parsed.name === 'Alex Jansen' && currentUser?.email !== 'alex@probooking.nl'
+            ? fallbackUserName
+            : parsed.name || fallbackUserName;
         return {
           ...initialSettings,
           ...parsed,
-          name: parsed.name || currentUser?.displayName || initialSettings.name,
-          email: parsed.email || currentUser?.email || initialSettings.email,
+          name: resolvedName,
+          email: parsed.email || fallbackUserEmail,
           availabilityMode: 'adhoc',
           adHocSchedule: Array.isArray(parsed.adHocSchedule)
             ? parsed.adHocSchedule
@@ -315,40 +376,42 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       } catch {
         return {
           ...initialSettings,
-          name: currentUser?.displayName || initialSettings.name,
-          email: currentUser?.email || initialSettings.email,
+          name: fallbackUserName,
+          profession: 'Personal Trainer & Coach',
+          email: fallbackUserEmail,
         };
       }
     }
     return {
       ...initialSettings,
-      name: currentUser?.displayName || initialSettings.name,
-      email: currentUser?.email || initialSettings.email,
+      name: fallbackUserName,
+      profession: 'Personal Trainer & Coach',
+      email: fallbackUserEmail,
     };
   });
 
   const [clients, setClients] = useState<Client[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_clients`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_clients`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_clients`);
     return saved ? JSON.parse(saved) : initialClients;
   });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_appointments`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_appointments`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_appointments`);
     return saved ? JSON.parse(saved) : initialAppointments;
   });
 
   const [packages, setPackages] = useState<ServicePackage[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_packages`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_packages`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_packages`);
     return saved ? JSON.parse(saved) : initialPackages;
   });
 
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_clientPackages`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_clientPackages`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_clientPackages`);
     return saved ? JSON.parse(saved) : initialClientPackages;
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_messages`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_messages`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_messages`);
     return saved ? JSON.parse(saved) : initialMessages;
   });
 
@@ -356,14 +419,45 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Invoicing & Administration
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_invoiceSettings`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_invoiceSettings`);
+    const pendingReg = getPendingRegistration();
+    const saved = localStorage.getItem(`${userStoragePrefix}_invoiceSettings`);
+    if (pendingReg && (pendingReg.isExplicitRegister || pendingReg.name)) {
+      const tName = pendingReg.name || fallbackUserName;
+      return {
+        ...initialInvoiceSettings,
+        businessName: `${tName} Coaching`,
+        email: pendingReg.email || fallbackUserEmail,
+        phone: pendingReg.phone || initialInvoiceSettings.phone,
+      };
+    }
     return saved ? JSON.parse(saved) : initialInvoiceSettings;
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    const saved = localStorage.getItem(`${userStoragePrefix}_invoices`) || localStorage.getItem(`${LOCAL_STORAGE_KEY}_invoices`);
+    const saved = localStorage.getItem(`${userStoragePrefix}_invoices`);
     return saved ? JSON.parse(saved) : initialInvoices;
   });
+
+  // Listen for profile initialization event from AuthScreen
+  useEffect(() => {
+    const handleProfileInitialized = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        uid: string;
+        settings: ProviderSettings;
+        invoiceSettings: InvoiceSettings;
+      }>;
+      if (customEvent.detail?.settings) {
+        setSettings(customEvent.detail.settings);
+      }
+      if (customEvent.detail?.invoiceSettings) {
+        setInvoiceSettings(customEvent.detail.invoiceSettings);
+      }
+    };
+    window.addEventListener('probooking:profile-initialized', handleProfileInitialized);
+    return () => {
+      window.removeEventListener('probooking:profile-initialized', handleProfileInitialized);
+    };
+  }, []);
 
   // Load trainer profile & clients from Firebase Firestore on mount / user change
   useEffect(() => {
@@ -381,6 +475,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const loadFromFirestore = async () => {
       try {
+        const pendingReg = getPendingRegistration();
+        if (pendingReg) {
+          localStorage.removeItem('probooking_pending_registration');
+        }
+
         const trainerDocRef = doc(db, 'trainers', uid);
         const snap = await getDoc(trainerDocRef);
 
@@ -388,22 +487,60 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         if (snap.exists()) {
           const data = snap.data();
-          const loadedSettings: ProviderSettings = data.settings
-            ? {
-                ...settings,
-                ...data.settings,
-                availabilityMode: 'adhoc',
-                adHocSchedule: Array.isArray(data.settings.adHocSchedule)
-                  ? data.settings.adHocSchedule
-                  : settings.adHocSchedule,
-                exceptions: Array.isArray(data.settings.exceptions)
-                  ? data.settings.exceptions
-                  : settings.exceptions,
-                services: Array.isArray(data.settings.services)
-                  ? data.settings.services
-                  : settings.services,
-              }
-            : settings;
+          const cloudSettings = data.settings || {};
+          const isDemoFallbackInCloud =
+            (cloudSettings.name === 'Alex Jansen' || data.name === 'Alex Jansen') &&
+            auth.currentUser?.email !== 'alex@probooking.nl';
+
+          const resolvedName =
+            pendingReg?.name ||
+            (!isDemoFallbackInCloud && (cloudSettings.name || data.name)) ||
+            auth.currentUser?.displayName ||
+            settings.name;
+
+          const resolvedProfession =
+            pendingReg?.profession ||
+            (!isDemoFallbackInCloud && (cloudSettings.profession || data.profession)) ||
+            settings.profession;
+
+          const resolvedPhone =
+            pendingReg?.phone ||
+            cloudSettings.phone ||
+            data.phone ||
+            settings.phone;
+
+          const resolvedRate =
+            pendingReg?.standardHourlyRate ||
+            cloudSettings.standardHourlyRate ||
+            data.standardHourlyRate ||
+            settings.standardHourlyRate;
+
+          const resolvedEmail =
+            pendingReg?.email ||
+            auth.currentUser?.email ||
+            cloudSettings.email ||
+            data.email ||
+            settings.email;
+
+          const loadedSettings: ProviderSettings = {
+            ...settings,
+            ...cloudSettings,
+            name: resolvedName,
+            profession: resolvedProfession,
+            phone: resolvedPhone,
+            standardHourlyRate: resolvedRate,
+            email: resolvedEmail,
+            availabilityMode: 'adhoc',
+            adHocSchedule: Array.isArray(cloudSettings.adHocSchedule)
+              ? cloudSettings.adHocSchedule
+              : settings.adHocSchedule,
+            exceptions: Array.isArray(cloudSettings.exceptions)
+              ? cloudSettings.exceptions
+              : settings.exceptions,
+            services: Array.isArray(cloudSettings.services)
+              ? cloudSettings.services
+              : settings.services,
+          };
 
           const loadedClients: Client[] = Array.isArray(data.clients) ? data.clients : clients;
           const loadedAppointments: Appointment[] = Array.isArray(data.appointments) ? data.appointments : appointments;
@@ -426,7 +563,18 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setClientPackages(loadedClientPackages);
           setMessages(loadedMessages);
           if (data.invoiceSettings) {
-            setInvoiceSettings((prev) => ({ ...prev, ...data.invoiceSettings }));
+            setInvoiceSettings((prev) => ({
+              ...prev,
+              ...data.invoiceSettings,
+              businessName:
+                pendingReg?.name
+                  ? `${pendingReg.name} Coaching`
+                  : data.invoiceSettings.businessName === 'Jansen Performance Coaching' &&
+                    auth.currentUser?.email !== 'alex@probooking.nl'
+                  ? `${resolvedName} Coaching`
+                  : data.invoiceSettings.businessName,
+              email: resolvedEmail,
+            }));
           }
           setInvoices(loadedInvoices);
 
@@ -438,14 +586,45 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setFirebaseSyncError(null);
         } else {
           // Initialize new trainer document in Firestore
+          const trainerName =
+            pendingReg?.name ||
+            auth.currentUser?.displayName ||
+            settings.name;
+          const trainerProfession =
+            pendingReg?.profession ||
+            settings.profession ||
+            'Personal Trainer & Coach';
+          const trainerPhone =
+            pendingReg?.phone ||
+            settings.phone;
+          const trainerRate =
+            pendingReg?.standardHourlyRate ||
+            settings.standardHourlyRate;
+          const trainerEmail =
+            pendingReg?.email ||
+            auth.currentUser?.email ||
+            settings.email;
+
           const initialTrainerSettings: ProviderSettings = {
             ...settings,
-            name: auth.currentUser?.displayName || settings.name,
-            email: auth.currentUser?.email || settings.email,
+            name: trainerName,
+            profession: trainerProfession,
+            phone: trainerPhone,
+            standardHourlyRate: trainerRate,
+            email: trainerEmail,
             availabilityMode: 'adhoc',
           };
+
+          const initialTrainerInvoiceSettings: InvoiceSettings = {
+            ...invoiceSettings,
+            businessName: `${trainerName} Coaching`,
+            email: trainerEmail,
+            phone: trainerPhone,
+          };
+
           prevSubcollectionsRef.current = {};
           setSettings(initialTrainerSettings);
+          setInvoiceSettings(initialTrainerInvoiceSettings);
 
           await setDoc(
             trainerDocRef,
@@ -462,7 +641,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               packages,
               clientPackages,
               messages,
-              invoiceSettings,
+              invoiceSettings: initialTrainerInvoiceSettings,
               invoices,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),

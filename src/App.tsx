@@ -84,12 +84,21 @@ export default function App() {
   }, []);
 
   if (!authReady) {
+    const savedLang = (() => {
+      try {
+        return localStorage.getItem('probooking_language');
+      } catch {
+        return null;
+      }
+    })();
     return (
       <div className="min-h-screen w-full bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-300 font-sans">
         <div className="h-10 w-10 rounded-xl bg-emerald-500 text-white font-bold text-lg italic flex items-center justify-center shadow-lg shadow-emerald-500/25 animate-pulse">
           PB
         </div>
-        <span className="text-xs font-medium text-slate-400">Authenticatie controleren...</span>
+        <span className="text-xs font-medium text-slate-400">
+          {savedLang === 'nl' ? 'Authenticatie controleren...' : 'Verifying authentication...'}
+        </span>
       </div>
     );
   }
