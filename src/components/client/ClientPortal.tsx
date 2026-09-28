@@ -383,51 +383,13 @@ export const ClientPortal: React.FC = () => {
   if (!currentClient) {
     return (
       <div className="p-12 text-center text-slate-500">
-        No client profile found. Please select a client or switch to Provider mode.
+        {language === 'nl' ? 'Geen klantprofiel gevonden.' : 'No client profile found.'}
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* Magic Link Verified Banner */}
-      {magicLinkNotification && (
-        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/90 text-white p-4 shadow-lg flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div className="text-xs">
-              <span className="font-bold text-white block">
-                {language === 'nl'
-                  ? `Ingelogd via persoonlijke boekingslink voor ${magicLinkNotification.clientName}`
-                  : `Logged in via personal booking link for ${magicLinkNotification.clientName}`}
-              </span>
-              <span className="text-emerald-300">
-                {language === 'nl' ? 'Geverifieerd met uniek token' : 'Verified with unique token'} (
-                <code className="font-mono text-[11px] text-emerald-200">{magicLinkNotification.token}</code>
-                ). {language === 'nl' ? 'Geen wachtwoord vereist.' : 'No password required.'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setRole('provider')}
-              className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
-            >
-              {language === 'nl' ? 'Terug naar Trainer' : 'Back to Trainer'}
-            </button>
-            <button
-              onClick={dismissMagicLinkNotification}
-              className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
-              title={language === 'nl' ? 'Sluiten' : 'Close'}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Cancellation Feedback Banner (Confirms slot freed up) */}
       {cancelSuccessNotification && (
         <div id="cancel-success-alert" className="rounded-2xl border border-emerald-500/40 bg-emerald-950/90 text-white p-4 shadow-lg flex items-center justify-between gap-3 animate-fade-in">
@@ -484,20 +446,10 @@ export const ClientPortal: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Service Provider: <strong className="text-slate-200">{settings.name}</strong> •{' '}
+              {language === 'nl' ? 'Trainer:' : 'Trainer:'} <strong className="text-slate-200">{settings.name}</strong> •{' '}
               {settings.profession}
             </p>
           </div>
-        </div>
-
-        {/* Return to Trainer Login */}
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <button
-            onClick={() => setRole('provider')}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition cursor-pointer"
-          >
-            {t.viewAsProvider}
-          </button>
         </div>
       </div>
 
