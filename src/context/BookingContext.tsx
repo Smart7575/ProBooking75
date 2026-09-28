@@ -7,6 +7,7 @@ import {
   reauthenticateWithPopup,
   GoogleAuthProvider,
   OAuthProvider,
+  signOut,
 } from 'firebase/auth';
 import { auth, db, formatFirestoreError, OperationType } from '../firebase';
 import {
@@ -54,7 +55,7 @@ import {
 import { translations } from '../utils/translations';
 import { SupportedCurrency, getCurrencySymbol, formatCurrency } from '../utils/currencyUtils';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
-import { getUrlMagicLinkParams } from '../utils/urlUtils';
+import { getUrlMagicLinkParams, clearUrlMagicLinkParams } from '../utils/urlUtils';
 
 interface BookingContextType {
   // State
@@ -289,11 +290,42 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Load initial from localStorage or defaults (default language: 'en' unless previously chosen)
   // If a magic link ?token=... is present in the URL, start immediately in 'client' role!
-  const [role, setRole] = useState<UserRole>(() =>
+  const [role, setRoleState] = useState<UserRole>(() =>
     initialMagicLinkParams.token ? 'client' : 'provider'
   );
+  const isMagicLinkModeRef = useRef<boolean>(Boolean(initialMagicLinkParams.token));
   const [activeClientId, setActiveClientId] = useState<string>('cli-1');
   const [magicLinkNotification, setMagicLinkNotification] = useState<{ clientName: string; token: string } | null>(null);
+
+  const setRole = useCallback(
+    (newRole: UserRole) => {
+      if (newRole === 'provider') {
+        const hasMagicTokenInUrl = Boolean(getUrlMagicLinkParams().token);
+        const isLeavingClientOrMagicLink =
+          role === 'client' ||
+          isMagicLinkModeRef.current ||
+          hasMagicTokenInUrl ||
+          Boolean(magicLinkNotification);
+
+        clearUrlMagicLinkParams();
+        setMagicLinkNotification(null);
+        isMagicLinkModeRef.current = false;
+        setRoleState('provider');
+
+        if (!auth.currentUser || isLeavingClientOrMagicLink) {
+          window.dispatchEvent(new CustomEvent('probooking:require-trainer-auth'));
+          if (auth.currentUser) {
+            signOut(auth).catch(() => {
+              // ignore signOut errors
+            });
+          }
+          return;
+        }
+      }
+      setRoleState(newRole);
+    },
+    [role, magicLinkNotification]
+  );
   const [language, setLanguageState] = useState<AppLanguage>(() => {
     try {
       const savedLang = localStorage.getItem('probooking_language');
@@ -542,9 +574,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (urlToken) {
               const localMatch = clients.find((c) => c.magicToken === urlToken);
               if (localMatch) {
+                isMagicLinkModeRef.current = true;
                 setActiveClientId(localMatch.id);
                 setSelectedChatClientId(localMatch.id);
-                setRole('client');
+                setRoleState('client');
                 setMagicLinkNotification({
                   clientName: localMatch.name,
                   token: localMatch.magicToken,
@@ -637,11 +670,12 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setClients(loadedClients);
 
           if (urlToken) {
+            isMagicLinkModeRef.current = true;
             const matchedClient = loadedClients.find((c) => c.magicToken === urlToken);
             if (matchedClient) {
               setActiveClientId(matchedClient.id);
               setSelectedChatClientId(matchedClient.id);
-              setRole('client');
+              setRoleState('client');
               setMagicLinkNotification({
                 clientName: matchedClient.name,
                 token: matchedClient.magicToken,
@@ -649,7 +683,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             } else if (loadedClients.length > 0) {
               setActiveClientId(loadedClients[0].id);
               setSelectedChatClientId(loadedClients[0].id);
-              setRole('client');
+              setRoleState('client');
             }
           } else if (loadedClients.length > 0) {
             setActiveClientId(loadedClients[0].id);
@@ -946,8 +980,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const simulateMagicLink = (token: string): boolean => {
     const found = clients.find((c) => c.magicToken === token);
     if (found) {
+      isMagicLinkModeRef.current = true;
       setActiveClientId(found.id);
-      setRole('client');
+      setSelectedChatClientId(found.id);
+      setRoleState('client');
       setMagicLinkNotification({
         clientName: found.name,
         token: found.magicToken,
@@ -957,6 +993,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         const url = new URL(window.location.href);
         url.searchParams.set('token', token);
         window.history.replaceState({}, '', url.toString());
+        window.dispatchEvent(new CustomEvent('probooking:magic-link-changed'));
       } catch {
         // Ignore in restricted iframe
       }
@@ -969,7 +1006,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     const { token } = getUrlMagicLinkParams();
     if (token) {
-      setRole('client');
+      isMagicLinkModeRef.current = true;
+      setRoleState('client');
       const found = clients.find((c) => c.magicToken === token);
       if (found) {
         setActiveClientId(found.id);

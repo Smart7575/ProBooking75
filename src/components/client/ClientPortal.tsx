@@ -399,10 +399,14 @@ export const ClientPortal: React.FC = () => {
             </div>
             <div className="text-xs">
               <span className="font-bold text-white block">
-                Ingelogd via persoonlijke boekingslink voor {magicLinkNotification.clientName}
+                {language === 'nl'
+                  ? `Ingelogd via persoonlijke boekingslink voor ${magicLinkNotification.clientName}`
+                  : `Logged in via personal booking link for ${magicLinkNotification.clientName}`}
               </span>
               <span className="text-emerald-300">
-                Geverifieerd met uniek token (<code className="font-mono text-[11px] text-emerald-200">{magicLinkNotification.token}</code>). Geen wachtwoord vereist.
+                {language === 'nl' ? 'Geverifieerd met uniek token' : 'Verified with unique token'} (
+                <code className="font-mono text-[11px] text-emerald-200">{magicLinkNotification.token}</code>
+                ). {language === 'nl' ? 'Geen wachtwoord vereist.' : 'No password required.'}
               </span>
             </div>
           </div>
@@ -411,12 +415,12 @@ export const ClientPortal: React.FC = () => {
               onClick={() => setRole('provider')}
               className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
             >
-              Terug naar Trainer
+              {language === 'nl' ? 'Terug naar Trainer' : 'Back to Trainer'}
             </button>
             <button
               onClick={dismissMagicLinkNotification}
               className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
-              title="Sluiten"
+              title={language === 'nl' ? 'Sluiten' : 'Close'}
             >
               <X className="h-4 w-4" />
             </button>
@@ -433,7 +437,7 @@ export const ClientPortal: React.FC = () => {
             </div>
             <div className="text-xs">
               <span className="font-bold text-white block">
-                Afspraak geannuleerd
+                {language === 'nl' ? 'Afspraak geannuleerd' : 'Appointment cancelled'}
               </span>
               <span className="text-emerald-300">
                 {cancelSuccessNotification}
@@ -451,12 +455,12 @@ export const ClientPortal: React.FC = () => {
               }}
               className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
             >
-              Nieuwe afspraak boeken
+              {language === 'nl' ? 'Nieuwe afspraak boeken' : 'Book new appointment'}
             </button>
             <button
               onClick={() => setCancelSuccessNotification(null)}
               className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
-              title="Sluiten"
+              title={language === 'nl' ? 'Sluiten' : 'Close'}
             >
               <X className="h-4 w-4" />
             </button>
@@ -486,40 +490,11 @@ export const ClientPortal: React.FC = () => {
           </div>
         </div>
 
-        {/* Client Switcher / Currency Switcher / Return to Admin */}
+        {/* Return to Trainer Login */}
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          {/* Currency Switcher */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200">
-            <Coins className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-              className="bg-transparent font-bold text-slate-200 outline-none cursor-pointer"
-              title="Valuta / Currency (EUR, USD, CHF)"
-            >
-              {CURRENCY_OPTIONS.map((opt) => (
-                <option key={opt.code} value={opt.code} className="bg-slate-900 text-white">
-                  {opt.code} ({opt.symbol})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <select
-            value={currentClient.id}
-            onChange={(e) => setActiveClientId(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none hover:border-slate-600 transition"
-            title="Switch test client"
-          >
-            {activeClients.map((c) => (
-              <option key={c.id} value={c.id} className="bg-slate-900 text-white">
-                Client: {c.name}
-              </option>
-            ))}
-          </select>
           <button
             onClick={() => setRole('provider')}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition"
+            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition cursor-pointer"
           >
             {t.viewAsProvider}
           </button>

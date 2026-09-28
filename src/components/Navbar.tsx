@@ -59,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
   const [copiedRules, setCopiedRules] = useState(false);
 
-  const isTrainerAuthenticated = Boolean(auth.currentUser);
+  const isTrainerAuthenticated = Boolean(auth.currentUser) && role === 'provider';
 
   const firestoreRulesSnippet = `rules_version = '2';
 service cloud.firestore {

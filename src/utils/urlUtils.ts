@@ -51,6 +51,22 @@ export const getUrlMagicLinkParams = (): { token: string | null; trainerId: stri
   }
 };
 
+export const clearUrlMagicLinkParams = (): void => {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('token');
+    url.searchParams.delete('trainer');
+    url.searchParams.delete('uid');
+    if (url.hash && (url.hash.includes('token=') || url.hash.includes('trainer='))) {
+      url.hash = '';
+    }
+    window.history.replaceState({}, '', url.toString());
+  } catch {
+    // Ignore in restricted iframe
+  }
+  window.dispatchEvent(new CustomEvent('probooking:magic-link-changed'));
+};
+
 export const getMagicLinkDetails = (token: string, trainerId?: string): MagicLinkDetails => {
   const currentOrigin = window.location.origin;
   const isDevContainer = currentOrigin.includes('ais-dev-');

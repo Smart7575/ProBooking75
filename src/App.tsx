@@ -16,9 +16,14 @@ import { BillingManagement } from './components/provider/BillingManagement';
 import { ClientPortal } from './components/client/ClientPortal';
 
 const MainLayout: React.FC = () => {
-  const { role, currentClient } = useBooking();
+  const { role } = useBooking();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [billingFilterClientId, setBillingFilterClientId] = useState<string | undefined>(undefined);
+
+  // Security guard: Provider views require an authenticated trainer session
+  if (role === 'provider' && !auth.currentUser) {
+    return <AuthScreen />;
+  }
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
@@ -27,7 +32,7 @@ const MainLayout: React.FC = () => {
 
       {/* Main Container */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {role === 'provider' ? (
+        {role === 'provider' && auth.currentUser ? (
           <div className="space-y-6">
             {currentTab === 'dashboard' && <ProviderDashboard onNavigate={setCurrentTab} />}
             {currentTab === 'calendar' && <CalendarView />}
@@ -76,17 +81,45 @@ const MainLayout: React.FC = () => {
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [urlMagicToken, setUrlMagicToken] = useState<string | null>(
+    () => getUrlMagicLinkParams().token
+  );
+  const [requireTrainerAuth, setRequireTrainerAuth] = useState(false);
 
   useEffect(() => {
     document.title = 'ProBooking75';
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthReady(true);
+      if (currentUser && !getUrlMagicLinkParams().token) {
+        setRequireTrainerAuth(false);
+      }
     });
-    return () => unsubscribe();
-  }, []);
 
-  const { token: urlMagicToken } = getUrlMagicLinkParams();
+    const handleMagicLinkChanged = () => {
+      const { token } = getUrlMagicLinkParams();
+      setUrlMagicToken(token);
+      if (token) {
+        setRequireTrainerAuth(false);
+      }
+    };
+
+    const handleRequireTrainerAuth = () => {
+      setUrlMagicToken(null);
+      setRequireTrainerAuth(true);
+    };
+
+    window.addEventListener('probooking:magic-link-changed', handleMagicLinkChanged);
+    window.addEventListener('probooking:require-trainer-auth', handleRequireTrainerAuth);
+    window.addEventListener('popstate', handleMagicLinkChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('probooking:magic-link-changed', handleMagicLinkChanged);
+      window.removeEventListener('probooking:require-trainer-auth', handleRequireTrainerAuth);
+      window.removeEventListener('popstate', handleMagicLinkChanged);
+    };
+  }, []);
 
   if (!authReady && !urlMagicToken) {
     const savedLang = (() => {
@@ -108,7 +141,7 @@ export default function App() {
     );
   }
 
-  if (!user && !urlMagicToken) {
+  if (requireTrainerAuth || (!user && !urlMagicToken)) {
     return <AuthScreen />;
   }
 
