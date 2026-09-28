@@ -19,6 +19,7 @@ import {
   Receipt,
   LogOut,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
@@ -129,6 +130,15 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-2.5 self-start md:self-center shrink-0">
+          <a
+            href="https://pro-booking75.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500 hover:border-emerald-400 px-4 py-2.5 text-xs sm:text-sm font-bold text-emerald-300 hover:text-slate-950 shadow-lg shadow-emerald-950/30 transition cursor-pointer"
+          >
+            <ExternalLink className="h-4 w-4 shrink-0" />
+            <span>Open Webapp (browser)</span>
+          </a>
           {(clients.length > 0 || appointments.length > 0) && (
             <button
               type="button"
@@ -494,12 +504,23 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
             <p className="text-[11px] text-slate-300 mb-3.5 leading-relaxed">
               Clients can book directly in 3 easy steps with your buffer time & durations enforced.
             </p>
-            <button
-              onClick={() => onNavigate('availability')}
-              className="w-full rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400 transition"
-            >
-              Configure Availability & Rules
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => onNavigate('availability')}
+                className="w-full rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400 transition cursor-pointer"
+              >
+                {language === 'nl' ? 'Beschikbaarheid & Regels' : 'Configure Availability & Rules'}
+              </button>
+              <a
+                href="https://pro-booking75.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-slate-700 hover:text-white transition cursor-pointer"
+              >
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                <span>https://pro-booking75.vercel.app</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
