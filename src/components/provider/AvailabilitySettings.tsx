@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { DaySchedule, ScheduleException, ServiceType, SupportedCurrency } from '../../types';
-import { CURRENCY_OPTIONS, getCurrencySymbol } from '../../utils/currencyUtils';
+import { CURRENCY_OPTIONS, getCurrencySymbol, sanitizeCurrencyCode } from '../../utils/currencyUtils';
 import { formatFullHumanDate, formatHumanDate, getTodayISO } from '../../utils/dateUtils';
 import { AdHocAvailabilityModal } from './AdHocAvailabilityModal';
 import { FixedWeeklyScheduleModal } from './FixedWeeklyScheduleModal';
@@ -225,12 +225,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
   // Save General settings
   const handleSaveGeneral = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanedCurrency = sanitizeCurrencyCode(profileForm.currency) || 'EUR';
     updateSettings({
       name: profileForm.name,
       profession: profileForm.profession,
       email: profileForm.email,
       phone: profileForm.phone,
-      currency: profileForm.currency,
+      currency: cleanedCurrency,
       standardHourlyRate: Number(profileForm.standardHourlyRate),
       standardSlotDuration: Number(profileForm.standardSlotDuration),
       bufferMinutes: Number(profileForm.bufferMinutes),
@@ -394,40 +395,88 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
             />
           </div>
 
-          {/* Currency Selection (EUR, USD, CHF) */}
+          {/* Currency Selection (EUR, USD, CHF or Custom Letters) */}
           <div>
             <label className="block font-bold text-slate-700 mb-1.5">
               {t.currencySetting}
             </label>
-            <select
-              value={profileForm.currency}
-              onChange={(e) => {
-                const nextVal = e.target.value as SupportedCurrency;
-                setProfileForm({ ...profileForm, currency: nextVal });
-                setCurrency(nextVal);
-              }}
-              className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white font-medium"
-            >
-              {CURRENCY_OPTIONS.map((opt) => (
-                <option key={opt.code} value={opt.code}>
-                  {isNl ? opt.labelNl : opt.labelEn}
+            <div className="flex items-center gap-2">
+              <select
+                value={
+                  CURRENCY_OPTIONS.some((opt) => opt.code === profileForm.currency)
+                    ? profileForm.currency
+                    : 'CUSTOM'
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'CUSTOM') {
+                    const customDefault =
+                      CURRENCY_OPTIONS.some((opt) => opt.code === profileForm.currency)
+                        ? 'GBP'
+                        : profileForm.currency || 'GBP';
+                    setProfileForm({ ...profileForm, currency: customDefault });
+                    setCurrency(customDefault);
+                  } else {
+                    setProfileForm({ ...profileForm, currency: val });
+                    setCurrency(val);
+                  }
+                }}
+                className="flex-1 min-w-0 rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white font-medium"
+              >
+                {CURRENCY_OPTIONS.map((opt) => (
+                  <option key={opt.code} value={opt.code}>
+                    {isNl ? opt.labelNl : opt.labelEn}
+                  </option>
+                ))}
+                <option value="CUSTOM">
+                  {isNl ? 'Eigen afkorting (letters)...' : 'Custom abbreviation (letters)...'}
                 </option>
-              ))}
-            </select>
+              </select>
+
+              <input
+                type="text"
+                maxLength={6}
+                value={profileForm.currency}
+                placeholder={isNl ? 'Bijv. GBP' : 'e.g. GBP'}
+                title={
+                  isNl
+                    ? 'Typ een eigen valuta-afkorting met letters (bijv. GBP, SRD, CAD)'
+                    : 'Enter a custom currency abbreviation using letters (e.g. GBP, SRD, CAD)'
+                }
+                onChange={(e) => {
+                  const lettersOnly = sanitizeCurrencyCode(e.target.value);
+                  setProfileForm({ ...profileForm, currency: lettersOnly });
+                  if (lettersOnly) {
+                    setCurrency(lettersOnly);
+                  }
+                }}
+                onBlur={() => {
+                  if (!profileForm.currency) {
+                    setProfileForm({ ...profileForm, currency: 'EUR' });
+                    setCurrency('EUR');
+                  }
+                }}
+                className="w-20 shrink-0 rounded-2xl border border-slate-200 p-2.5 text-center font-mono font-bold uppercase text-slate-900 focus:border-emerald-500 outline-none transition"
+              />
+            </div>
             <p className="text-[11px] text-slate-500 mt-1">
               {isNl ? 'Actief:' : 'Active:'}{' '}
-              <strong className="text-emerald-700 font-semibold">{profileForm.currency}</strong> ({getCurrencySymbol(profileForm.currency as SupportedCurrency)})
+              <strong className="text-emerald-700 font-semibold">
+                {profileForm.currency || 'EUR'}
+              </strong>{' '}
+              ({getCurrencySymbol(profileForm.currency || 'EUR')}) •{' '}
+              {isNl ? 'Kies of typ letters' : 'Select or type letters'}
             </p>
           </div>
 
           {/* Standard Hourly Rate (FR-7.1) */}
           <div>
             <label className="block font-bold text-slate-700 mb-1.5">
-              {t.standardRate} ({getCurrencySymbol(profileForm.currency as SupportedCurrency)})
+              {t.standardRate} ({getCurrencySymbol(profileForm.currency || 'EUR')})
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-2.5 text-slate-400 font-semibold text-xs">
-                {getCurrencySymbol(profileForm.currency as SupportedCurrency)}
+                {getCurrencySymbol(profileForm.currency || 'EUR')}
               </span>
               <input
                 type="number"
@@ -435,7 +484,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 value={profileForm.standardHourlyRate}
                 onChange={(e) => setProfileForm({ ...profileForm, standardHourlyRate: Number(e.target.value) })}
                 className={`w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition ${
-                  profileForm.currency === 'CHF' ? 'pl-11' : 'pl-8'
+                  getCurrencySymbol(profileForm.currency || 'EUR').length > 3
+                    ? 'pl-14'
+                    : getCurrencySymbol(profileForm.currency || 'EUR').length > 1
+                    ? 'pl-11'
+                    : 'pl-8'
                 }`}
               />
             </div>

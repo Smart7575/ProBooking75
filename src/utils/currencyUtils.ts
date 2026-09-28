@@ -1,14 +1,14 @@
-export type SupportedCurrency = 'EUR' | 'USD' | 'CHF';
+export type SupportedCurrency = 'EUR' | 'USD' | 'CHF' | string;
 
 export interface CurrencyConfig {
-  code: SupportedCurrency;
+  code: string;
   symbol: string;
   labelEn: string;
   labelNl: string;
   example: string;
 }
 
-export const SUPPORTED_CURRENCIES: Record<SupportedCurrency, CurrencyConfig> = {
+export const SUPPORTED_CURRENCIES: Record<'EUR' | 'USD' | 'CHF', CurrencyConfig> = {
   EUR: {
     code: 'EUR',
     symbol: '€',
@@ -38,23 +38,28 @@ export const CURRENCY_OPTIONS: CurrencyConfig[] = [
   SUPPORTED_CURRENCIES.CHF,
 ];
 
+export function sanitizeCurrencyCode(input?: string): string {
+  if (!input) return '';
+  return input.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 6);
+}
+
 export function getCurrencySymbol(currency?: string): string {
-  if (!currency) return '€';
-  const c = currency.toUpperCase();
+  const c = sanitizeCurrencyCode(currency);
+  if (!c || c === 'EUR') return '€';
   if (c === 'USD') return '$';
   if (c === 'CHF') return 'CHF';
-  return '€';
+  return c;
 }
 
 export function formatCurrency(amount: number | undefined | null, currency?: string): string {
   const safeAmount = Number(amount || 0);
-  const code = (currency?.toUpperCase() || 'EUR') as SupportedCurrency;
-  
+  const code = sanitizeCurrencyCode(currency) || 'EUR';
+
+  if (code === 'EUR') {
+    return `€${safeAmount.toFixed(2)}`;
+  }
   if (code === 'USD') {
     return `$${safeAmount.toFixed(2)}`;
   }
-  if (code === 'CHF') {
-    return `CHF ${safeAmount.toFixed(2)}`;
-  }
-  return `€${safeAmount.toFixed(2)}`;
+  return `${code} ${safeAmount.toFixed(2)}`;
 }

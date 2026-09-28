@@ -53,7 +53,7 @@ import {
   addDays,
 } from '../utils/dateUtils';
 import { translations } from '../utils/translations';
-import { SupportedCurrency, getCurrencySymbol, formatCurrency } from '../utils/currencyUtils';
+import { SupportedCurrency, getCurrencySymbol, formatCurrency, sanitizeCurrencyCode } from '../utils/currencyUtils';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
 import { getUrlMagicLinkParams, clearUrlMagicLinkParams } from '../utils/urlUtils';
 
@@ -1024,13 +1024,13 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Currency management
   const currency = useMemo<SupportedCurrency>(() => {
-    const c = settings.currency?.toUpperCase();
-    if (c === 'USD' || c === 'CHF') return c;
-    return 'EUR';
+    const c = sanitizeCurrencyCode(settings.currency);
+    return c || 'EUR';
   }, [settings.currency]);
 
   const setCurrency = (newCurrency: SupportedCurrency) => {
-    updateSettings({ currency: newCurrency });
+    const cleaned = sanitizeCurrencyCode(newCurrency) || 'EUR';
+    updateSettings({ currency: cleaned });
   };
 
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
