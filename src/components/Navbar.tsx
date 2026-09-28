@@ -59,17 +59,22 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
   const [copiedRules, setCopiedRules] = useState(false);
 
+  const isTrainerAuthenticated = Boolean(auth.currentUser);
+
   const firestoreRulesSnippet = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /trainers/{trainerId} {
-      allow read, write: if request.auth != null && request.auth.uid == trainerId;
+      allow read, create, update: if true;
+      allow delete: if request.auth != null && request.auth.uid == trainerId;
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == trainerId;
+        allow read, create, update: if true;
+        allow delete: if request.auth != null && request.auth.uid == trainerId;
       }
     }
     match /{collection}/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, create, update: if true;
+      allow delete: if request.auth != null;
     }
   }
 }`;
@@ -256,98 +261,106 @@ service cloud.firestore {
 
           {/* Right Actions: Persona Switcher, Currency, Language, Reset */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Interactive Persona / Role Switcher */}
-            <div className="relative">
-              <button
-                onClick={() => setShowRoleDropdown((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 shadow-xs hover:bg-slate-700 transition shrink-0"
-              >
-                {role === 'provider' ? (
+            {/* Interactive Persona / Role Switcher (only for authenticated trainer; static client badge for public magic link clients) */}
+            {isTrainerAuthenticated ? (
+              <div className="relative">
+                <button
+                  onClick={() => setShowRoleDropdown((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 shadow-xs hover:bg-slate-700 transition shrink-0"
+                >
+                  {role === 'provider' ? (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+                      <User className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="hidden lg:inline">Trainer ({settings.name.split(' ')[0]})</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-blue-400"></div>
+                      <Users className="h-3.5 w-3.5 text-blue-400" />
+                      <span className="hidden lg:inline">{currentClient?.name?.split(' ')[0] || 'Client'}</span>
+                    </>
+                  )}
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                </button>
+
+                {showRoleDropdown && (
                   <>
-                    <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-                    <User className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="hidden lg:inline">Trainer ({settings.name.split(' ')[0]})</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="h-2 w-2 rounded-full bg-blue-400"></div>
-                    <Users className="h-3.5 w-3.5 text-blue-400" />
-                    <span className="hidden lg:inline">{currentClient?.name?.split(' ')[0] || 'Client'}</span>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowRoleDropdown(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-700 bg-slate-900 p-2.5 shadow-2xl z-50 text-xs text-slate-200">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Switch Persona / Role
+                      </div>
+
+                      {/* Option 1: Provider */}
+                      <button
+                        onClick={() => {
+                          setRole('provider');
+                          setShowRoleDropdown(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 transition mt-1 ${
+                          role === 'provider'
+                            ? 'bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30'
+                            : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                            <ShieldCheck className="h-4 w-4" />
+                          </div>
+                          <div className="text-left">
+                            <div className="font-semibold text-white">{settings.name} (Provider)</div>
+                            <div className="text-[10px] text-slate-400">Full agenda, rates & CRM control</div>
+                          </div>
+                        </div>
+                        {role === 'provider' && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+                      </button>
+
+                      <div className="my-2 border-t border-slate-800"></div>
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Test Client Portal (Magic Link)
+                      </div>
+
+                      <div className="space-y-1 mt-1">
+                        {activeClients.map((client) => {
+                          const isSelected = role === 'client' && activeClientId === client.id;
+                          return (
+                            <button
+                              key={client.id}
+                              onClick={() => {
+                                setActiveClientId(client.id);
+                                setRole('client');
+                                setShowRoleDropdown(false);
+                              }}
+                              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 transition ${
+                                isSelected
+                                  ? 'bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30'
+                                  : 'text-slate-300 hover:bg-slate-800'
+                              }`}
+                            >
+                              <div className="text-left truncate">
+                                <div className="text-white truncate font-medium">{client.name}</div>
+                                <div className="text-[10px] text-slate-400 truncate">{client.email}</div>
+                              </div>
+                              {isSelected && <Check className="h-3.5 w-3.5 text-blue-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </>
                 )}
-                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-              </button>
-
-              {showRoleDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowRoleDropdown(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-700 bg-slate-900 p-2.5 shadow-2xl z-50 text-xs text-slate-200">
-                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Switch Persona / Role
-                    </div>
-
-                  {/* Option 1: Provider */}
-                  <button
-                    onClick={() => {
-                      setRole('provider');
-                      setShowRoleDropdown(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 transition mt-1 ${
-                      role === 'provider'
-                        ? 'bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30'
-                        : 'text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                        <ShieldCheck className="h-4 w-4" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-semibold text-white">{settings.name} (Provider)</div>
-                        <div className="text-[10px] text-slate-400">Full agenda, rates & CRM control</div>
-                      </div>
-                    </div>
-                    {role === 'provider' && <Check className="h-3.5 w-3.5 text-emerald-400" />}
-                  </button>
-
-                  <div className="my-2 border-t border-slate-800"></div>
-                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Test Client Portal (Magic Link)
-                  </div>
-
-                  <div className="space-y-1 mt-1">
-                    {activeClients.map((client) => {
-                      const isSelected = role === 'client' && activeClientId === client.id;
-                      return (
-                        <button
-                          key={client.id}
-                          onClick={() => {
-                            setActiveClientId(client.id);
-                            setRole('client');
-                            setShowRoleDropdown(false);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 transition ${
-                            isSelected
-                              ? 'bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30'
-                              : 'text-slate-300 hover:bg-slate-800'
-                          }`}
-                        >
-                          <div className="text-left truncate">
-                            <div className="text-white truncate font-medium">{client.name}</div>
-                            <div className="text-[10px] text-slate-400 truncate">{client.email}</div>
-                          </div>
-                          {isSelected && <Check className="h-3.5 w-3.5 text-blue-400" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 shrink-0">
+                <div className="h-2 w-2 rounded-full bg-blue-400"></div>
+                <Users className="h-3.5 w-3.5 text-blue-400" />
+                <span>{currentClient?.name || 'Client Portal'}</span>
+              </div>
             )}
-            </div>
 
             {/* Language Switcher */}
             <button
@@ -359,50 +372,54 @@ service cloud.firestore {
               <span className="uppercase">{language}</span>
             </button>
 
-            {/* Firebase Cloud Sync Status Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (firebaseSyncStatus === 'error') {
-                  setShowFirebaseModal(true);
-                } else {
-                  forceSyncToFirebase();
+            {/* Firebase Cloud Sync Status Button (only for authenticated trainer) */}
+            {isTrainerAuthenticated && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (firebaseSyncStatus === 'error') {
+                    setShowFirebaseModal(true);
+                  } else {
+                    forceSyncToFirebase();
+                  }
+                }}
+                title={
+                  firebaseSyncStatus === 'error'
+                    ? `Firebase (probooking75): ${firebaseSyncError || 'Firestore Rules vereist'}. Klik voor instructies & synchronisatie.`
+                    : 'Gekoppeld aan Firebase Firestore (probooking75). Klik om direct te synchroniseren.'
                 }
-              }}
-              title={
-                firebaseSyncStatus === 'error'
-                  ? `Firebase (probooking75): ${firebaseSyncError || 'Firestore Rules vereist'}. Klik voor instructies & synchronisatie.`
-                  : 'Gekoppeld aan Firebase Firestore (probooking75). Klik om direct te synchroniseren.'
-              }
-              className={`hidden sm:flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
-                firebaseSyncStatus === 'synced'
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-                  : firebaseSyncStatus === 'connecting'
-                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                  : 'border-amber-500/50 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-              }`}
-            >
-              <Database className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden xl:inline font-mono text-[11px]">probooking75</span>
-              <span
-                className={`h-2 w-2 rounded-full ${
+                className={`hidden sm:flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
                   firebaseSyncStatus === 'synced'
-                    ? 'bg-emerald-400'
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
                     : firebaseSyncStatus === 'connecting'
-                    ? 'bg-amber-400 animate-pulse'
-                    : 'bg-amber-400'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                    : 'border-amber-500/50 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
                 }`}
-              />
-            </button>
+              >
+                <Database className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden xl:inline font-mono text-[11px]">probooking75</span>
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    firebaseSyncStatus === 'synced'
+                      ? 'bg-emerald-400'
+                      : firebaseSyncStatus === 'connecting'
+                      ? 'bg-amber-400 animate-pulse'
+                      : 'bg-amber-400'
+                  }`}
+                />
+              </button>
+            )}
 
-            {/* Reset Demo Button */}
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              title={t.resetDemo}
-              className="hidden sm:flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs font-medium text-slate-300 shadow-xs hover:bg-rose-900/40 hover:text-rose-300 hover:border-rose-700 transition"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
+            {/* Reset Demo Button (only for authenticated trainer) */}
+            {isTrainerAuthenticated && (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                title={t.resetDemo}
+                className="hidden sm:flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs font-medium text-slate-300 shadow-xs hover:bg-rose-900/40 hover:text-rose-300 hover:border-rose-700 transition"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )}
 
             {/* Sign Out Button */}
             {auth.currentUser && (

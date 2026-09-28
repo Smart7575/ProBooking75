@@ -3,6 +3,7 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { BookingProvider, useBooking } from './context/BookingContext';
+import { getUrlMagicLinkParams } from './utils/urlUtils';
 import { Navbar } from './components/Navbar';
 import { ProviderDashboard } from './components/provider/ProviderDashboard';
 import { CalendarView } from './components/provider/CalendarView';
@@ -85,7 +86,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  if (!authReady) {
+  const { token: urlMagicToken } = getUrlMagicLinkParams();
+
+  if (!authReady && !urlMagicToken) {
     const savedLang = (() => {
       try {
         return localStorage.getItem('probooking_language');
@@ -105,7 +108,7 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user && !urlMagicToken) {
     return <AuthScreen />;
   }
 

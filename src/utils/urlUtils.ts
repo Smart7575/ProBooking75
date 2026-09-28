@@ -13,27 +13,62 @@
  * 2. Or the user can test magic links directly within the app using the in-app simulator!
  */
 
+import { auth } from '../firebase';
+
 export interface MagicLinkDetails {
   token: string;
+  trainerId?: string;
   isDevContainer: boolean;
   inAppUrl: string;
   publicSharedUrl: string;
   explanation: string;
 }
 
-export const getMagicLinkDetails = (token: string): MagicLinkDetails => {
+export const getUrlMagicLinkParams = (): { token: string | null; trainerId: string | null } => {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    let token = searchParams.get('token');
+    let trainerId = searchParams.get('trainer') || searchParams.get('uid');
+
+    if ((!token || !trainerId) && window.location.hash) {
+      const hash = window.location.hash.replace(/^#\/?/, '');
+      const queryPart = hash.includes('?') ? hash.split('?')[1] : hash;
+      const hashParams = new URLSearchParams(queryPart);
+      if (!token) {
+        token = hashParams.get('token') || (hash.startsWith('token=') ? hash.split('=')[1]?.split('&')[0] : null);
+      }
+      if (!trainerId) {
+        trainerId = hashParams.get('trainer') || hashParams.get('uid');
+      }
+    }
+
+    return {
+      token: token ? token.trim() : null,
+      trainerId: trainerId ? trainerId.trim() : null,
+    };
+  } catch {
+    return { token: null, trainerId: null };
+  }
+};
+
+export const getMagicLinkDetails = (token: string, trainerId?: string): MagicLinkDetails => {
   const currentOrigin = window.location.origin;
   const isDevContainer = currentOrigin.includes('ais-dev-');
   const pathname = window.location.pathname.endsWith('/')
     ? window.location.pathname
     : `${window.location.pathname}/`;
 
-  const inAppUrl = `${currentOrigin}${pathname}?token=${token}`;
+  const resolvedTrainerId = trainerId || auth.currentUser?.uid || undefined;
+  const querySuffix = `?token=${encodeURIComponent(token)}${
+    resolvedTrainerId ? `&trainer=${encodeURIComponent(resolvedTrainerId)}` : ''
+  }`;
+
+  const inAppUrl = `${currentOrigin}${pathname}${querySuffix}`;
 
   const publicOrigin = isDevContainer
     ? currentOrigin.replace('ais-dev-', 'ais-pre-')
     : currentOrigin;
-  const publicSharedUrl = `${publicOrigin}${pathname}?token=${token}`;
+  const publicSharedUrl = `${publicOrigin}${pathname}${querySuffix}`;
 
   const explanation = isDevContainer
     ? 'De ontwikkel-URL (ais-dev) is privé beveiligd door Google AI Studio. Buiten deze ontwikkelsessie (bv. in incognito of op mobiel) geeft Google Cloud Run een 403 error. Klik op "Share" in AI Studio voor publieke toegang, of test direct in deze preview.'
@@ -41,6 +76,7 @@ export const getMagicLinkDetails = (token: string): MagicLinkDetails => {
 
   return {
     token,
+    trainerId: resolvedTrainerId,
     isDevContainer,
     inAppUrl,
     publicSharedUrl,

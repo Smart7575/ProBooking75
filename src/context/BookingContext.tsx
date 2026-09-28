@@ -54,6 +54,7 @@ import {
 import { translations } from '../utils/translations';
 import { SupportedCurrency, getCurrencySymbol, formatCurrency } from '../utils/currencyUtils';
 import { formatInvoiceNumber } from '../utils/invoiceUtils';
+import { getUrlMagicLinkParams } from '../utils/urlUtils';
 
 interface BookingContextType {
   // State
@@ -274,12 +275,23 @@ const LOCAL_STORAGE_KEY = 'probooking_app_state_v1';
 
 export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const currentUser = auth.currentUser;
-  const userStoragePrefix = currentUser?.uid
-    ? `${LOCAL_STORAGE_KEY}_${currentUser.uid}`
+  const initialMagicLinkParams = getUrlMagicLinkParams();
+  const [resolvedTrainerUid, setResolvedTrainerUid] = useState<string | null>(
+    () => currentUser?.uid || initialMagicLinkParams.trainerId || null
+  );
+  const resolvedTrainerUidRef = useRef<string | null>(
+    currentUser?.uid || initialMagicLinkParams.trainerId || null
+  );
+  const effectiveUid = currentUser?.uid || resolvedTrainerUid;
+  const userStoragePrefix = effectiveUid
+    ? `${LOCAL_STORAGE_KEY}_${effectiveUid}`
     : LOCAL_STORAGE_KEY;
 
   // Load initial from localStorage or defaults (default language: 'en' unless previously chosen)
-  const [role, setRole] = useState<UserRole>('provider');
+  // If a magic link ?token=... is present in the URL, start immediately in 'client' role!
+  const [role, setRole] = useState<UserRole>(() =>
+    initialMagicLinkParams.token ? 'client' : 'provider'
+  );
   const [activeClientId, setActiveClientId] = useState<string>('cli-1');
   const [magicLinkNotification, setMagicLinkNotification] = useState<{ clientName: string; token: string } | null>(null);
   const [language, setLanguageState] = useState<AppLanguage>(() => {
@@ -462,10 +474,12 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   }, []);
 
-  // Load trainer profile & clients from Firebase Firestore on mount / user change
+  // Load trainer profile & clients from Firebase Firestore on mount / user change / magic link
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) {
+    const { token: urlToken, trainerId: urlTrainerId } = getUrlMagicLinkParams();
+    const authUid = auth.currentUser?.uid || null;
+
+    if (!authUid && !urlToken && !urlTrainerId) {
       isHydratedFromFirestoreRef.current = true;
       setIsHydratedFromFirestore(true);
       return;
@@ -477,13 +491,77 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setFirebaseSyncStatus('connecting');
 
     const loadFromFirestore = async () => {
+      let targetUid: string | null = authUid || urlTrainerId || null;
+
       try {
         const pendingReg = getPendingRegistration();
-        if (pendingReg) {
+        if (pendingReg && authUid) {
           localStorage.removeItem('probooking_pending_registration');
         }
 
-        const trainerDocRef = doc(db, 'trainers', uid);
+        // If accessed via public magic link without trainer UID in URL, look up trainer UID by client magicToken
+        if (!targetUid && urlToken) {
+          try {
+            const clientQuery = query(
+              collection(db, 'clients'),
+              where('magicToken', '==', urlToken)
+            );
+            const clientSnap = await getDocs(clientQuery);
+            if (!clientSnap.empty) {
+              const foundTrainerId = clientSnap.docs[0].data()?.trainerId;
+              if (foundTrainerId) {
+                targetUid = foundTrainerId;
+              }
+            }
+          } catch {
+            // Fallback to scanning trainers collection below
+          }
+
+          if (!targetUid) {
+            try {
+              const trainersSnap = await getDocs(collection(db, 'trainers'));
+              trainersSnap.forEach((docSnap) => {
+                if (targetUid) return;
+                const d = docSnap.data();
+                if (
+                  Array.isArray(d.clients) &&
+                  d.clients.some((c: Client) => c.magicToken === urlToken)
+                ) {
+                  targetUid = docSnap.id;
+                }
+              });
+            } catch {
+              // Ignore if trainers collection cannot be listed
+            }
+          }
+        }
+
+        if (!targetUid) {
+          // If no cloud trainer found (e.g. demo token only in local state), match locally
+          if (!isCancelled) {
+            if (urlToken) {
+              const localMatch = clients.find((c) => c.magicToken === urlToken);
+              if (localMatch) {
+                setActiveClientId(localMatch.id);
+                setSelectedChatClientId(localMatch.id);
+                setRole('client');
+                setMagicLinkNotification({
+                  clientName: localMatch.name,
+                  token: localMatch.magicToken,
+                });
+              }
+            }
+            isHydratedFromFirestoreRef.current = true;
+            setIsHydratedFromFirestore(true);
+            setFirebaseSyncStatus('synced');
+          }
+          return;
+        }
+
+        resolvedTrainerUidRef.current = targetUid;
+        setResolvedTrainerUid(targetUid);
+
+        const trainerDocRef = doc(db, 'trainers', targetUid);
         const snap = await getDoc(trainerDocRef);
 
         if (isCancelled) return;
@@ -557,10 +635,27 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
           setSettings(loadedSettings);
           setClients(loadedClients);
-          if (loadedClients.length > 0) {
+
+          if (urlToken) {
+            const matchedClient = loadedClients.find((c) => c.magicToken === urlToken);
+            if (matchedClient) {
+              setActiveClientId(matchedClient.id);
+              setSelectedChatClientId(matchedClient.id);
+              setRole('client');
+              setMagicLinkNotification({
+                clientName: matchedClient.name,
+                token: matchedClient.magicToken,
+              });
+            } else if (loadedClients.length > 0) {
+              setActiveClientId(loadedClients[0].id);
+              setSelectedChatClientId(loadedClients[0].id);
+              setRole('client');
+            }
+          } else if (loadedClients.length > 0) {
             setActiveClientId(loadedClients[0].id);
             setSelectedChatClientId(loadedClients[0].id);
           }
+
           setAppointments(loadedAppointments);
           setPackages(loadedPackages);
           setClientPackages(loadedClientPackages);
@@ -587,7 +682,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setSyncTrigger((n) => n + 1);
           setFirebaseSyncStatus('synced');
           setFirebaseSyncError(null);
-        } else {
+        } else if (authUid) {
           // Initialize new trainer document in Firestore
           const trainerName =
             pendingReg?.name ||
@@ -632,7 +727,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           await setDoc(
             trainerDocRef,
             {
-              uid,
+              uid: authUid,
               name: initialTrainerSettings.name,
               profession: initialTrainerSettings.profession,
               email: initialTrainerSettings.email,
@@ -662,7 +757,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           }
         }
       } catch (err) {
-        const errInfo = formatFirestoreError(err, OperationType.GET, `trainers/${uid}`);
+        const errInfo = formatFirestoreError(err, OperationType.GET, `trainers/${targetUid || 'unknown'}`);
         if (!isCancelled) {
           isHydratedFromFirestoreRef.current = true;
           isFirestoreWritableRef.current = false;
@@ -721,9 +816,9 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(`${userStoragePrefix}_invoices`, JSON.stringify(invoices));
   }, [invoices, userStoragePrefix]);
 
-  // Persist changes to Firebase Firestore whenever trainer state updates
+  // Persist changes to Firebase Firestore whenever trainer/client state updates
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
+    const uid = auth.currentUser?.uid || resolvedTrainerUidRef.current;
     if (!uid || !isHydratedFromFirestoreRef.current || !isFirestoreWritableRef.current || isAccountDeletingRef.current) return;
 
     const timer = setTimeout(async () => {
@@ -872,29 +967,18 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Check URL search & hash params for token (simulated magic booking link FR-4.2)
   useEffect(() => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      let token = searchParams.get('token');
-
-      if (!token && window.location.hash) {
-        const hash = window.location.hash.replace(/^#\/?/, '');
-        const hashParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : hash);
-        token = hashParams.get('token') || (hash.startsWith('token=') ? hash.split('=')[1] : null);
+    const { token } = getUrlMagicLinkParams();
+    if (token) {
+      setRole('client');
+      const found = clients.find((c) => c.magicToken === token);
+      if (found) {
+        setActiveClientId(found.id);
+        setSelectedChatClientId(found.id);
+        setMagicLinkNotification({
+          clientName: found.name,
+          token: found.magicToken,
+        });
       }
-
-      if (token) {
-        const found = clients.find((c) => c.magicToken === token);
-        if (found) {
-          setActiveClientId(found.id);
-          setRole('client');
-          setMagicLinkNotification({
-            clientName: found.name,
-            token: found.magicToken,
-          });
-        }
-      }
-    } catch {
-      // Ignore URL parse error in sandboxed environment
     }
   }, [clients]);
 
@@ -925,7 +1009,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Client Management
   const syncClientToFirestore = async (client: Client) => {
-    const uid = auth.currentUser?.uid;
+    const uid = auth.currentUser?.uid || resolvedTrainerUidRef.current;
     if (!uid) return;
     try {
       const payload = {
