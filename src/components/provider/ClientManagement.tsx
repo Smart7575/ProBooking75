@@ -403,7 +403,10 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
           // Active package & open session status
           const clientActivePackages = getClientActivePackages(client.id);
-          const totalRemainingSessions = clientActivePackages.reduce((acc, cp) => acc + cp.remainingSessions, 0);
+          const totalRemainingSessions =
+            Math.round(
+              clientActivePackages.reduce((acc, cp) => acc + cp.remainingSessions, 0) * 100
+            ) / 100;
           const isClientSelected = selectedClientIds.includes(client.id);
 
           return (
@@ -588,7 +591,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                                   {cp.packageName}
                                 </span>
                                 <span className="shrink-0 text-xs font-black text-indigo-700 ml-1">
-                                  {cp.remainingSessions} / {cp.totalSessions} {language === 'nl' ? 'open' : 'left'}
+                                  {Number(cp.remainingSessions.toFixed(2))} / {cp.totalSessions} {language === 'nl' ? 'open' : 'left'}
                                 </span>
                               </div>
 
@@ -604,9 +607,9 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
                               <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 flex-wrap gap-1">
                                 <span>
-                                  {cp.totalSessions - cp.remainingSessions} {language === 'nl' ? 'verbruikt' : 'used'} •{' '}
+                                  {Number((cp.totalSessions - cp.remainingSessions).toFixed(2))} {language === 'nl' ? 'verbruikt' : 'used'} •{' '}
                                   <strong className="text-slate-800 font-semibold">
-                                    {cp.remainingSessions} {language === 'nl' ? 'open' : 'remaining'}
+                                    {Number(cp.remainingSessions.toFixed(2))} {language === 'nl' ? 'open' : 'remaining'}
                                   </strong>
                                 </span>
                                 {cp.expiresAt ? (

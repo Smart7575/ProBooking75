@@ -215,7 +215,7 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
-                title="Wissen"
+                title={language === 'nl' ? 'Wissen' : 'Clear'}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -422,7 +422,10 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
               {activeClientPackages.length > 0 && (
                 <div className="hidden lg:flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-xs text-amber-800 font-semibold">
                   <Package className="h-3.5 w-3.5 text-amber-600" />
-                  <span>{activeClientPackages[0].packageName} ({activeClientPackages[0].remainingSessions} over)</span>
+                  <span>
+                    {activeClientPackages[0].packageName} ({activeClientPackages[0].remainingSessions}{' '}
+                    {language === 'nl' ? 'over' : 'left'})
+                  </span>
                 </div>
               )}
               {onNavigateToTab && (
@@ -499,7 +502,7 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
                             }}
                             className="rounded-lg bg-white px-2.5 py-1 text-[10px] font-bold text-emerald-900 hover:bg-emerald-50 transition"
                           >
-                            Opslaan
+                            {language === 'nl' ? 'Opslaan' : 'Save'}
                           </button>
                         </div>
                       </div>
@@ -521,7 +524,7 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
                                 setEditingMessageText(msg.text);
                               }}
                               className="p-0.5 rounded hover:bg-black/15 transition cursor-pointer"
-                              title="Bericht bewerken"
+                              title={language === 'nl' ? 'Bericht bewerken' : 'Edit message'}
                             >
                               <Edit2 className="h-3 w-3" />
                             </button>
@@ -530,7 +533,7 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
                             type="button"
                             onClick={() => deleteChatMessage(msg.id)}
                             className="p-0.5 rounded hover:bg-black/15 transition cursor-pointer"
-                            title="Bericht verwijderen"
+                            title={language === 'nl' ? 'Bericht verwijderen' : 'Delete message'}
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
@@ -608,8 +611,14 @@ export const ProviderChatView: React.FC<ProviderChatViewProps> = ({ onNavigateTo
         <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">
           <div>
             <MessageSquare className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-700">Geen actieve cliënt geselecteerd</p>
-            <p className="text-xs text-slate-400 mt-1">Selecteer een cliënt in de linkerlijst om te chatten.</p>
+            <p className="text-sm font-bold text-slate-700">
+              {language === 'nl' ? 'Geen actieve cliënt geselecteerd' : 'No active client selected'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              {language === 'nl'
+                ? 'Selecteer een cliënt in de linkerlijst om te chatten.'
+                : 'Select a client from the list on the left to start chatting.'}
+            </p>
           </div>
         </div>
       )}

@@ -49,7 +49,8 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
   isSyntheticWeekly = false,
   onPlanVacation,
 }) => {
-  const { saveWorkingBlock, removeWorkingBlock, settings, t } = useBooking();
+  const { saveWorkingBlock, removeWorkingBlock, settings, language, t } = useBooking();
+  const isNl = language === 'nl';
 
   const defaultTrainerSlot = settings.standardSlotDuration || 60;
   const defaultTrainerBuffer =
@@ -285,7 +286,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
       return `${diff} min`;
     }
     const hours = Math.round((diff / 60) * 100) / 100;
-    return `${hours} uur`;
+    return isNl ? `${hours} uur` : `${hours}h`;
   };
 
   const handleSave = () => {
@@ -294,7 +295,11 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
     const eMin = endTimeToMinutes(endTime);
 
     if (eMin <= sMin) {
-      setErrorMsg('Eindtijd moet na de starttijd liggen.');
+      setErrorMsg(
+        isNl
+          ? 'Eindtijd moet na de starttijd liggen.'
+          : 'End time must be after the start time.'
+      );
       return;
     }
 
@@ -302,7 +307,11 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
       const bsMin = timeToMinutes(breakStart);
       const beMin = endTimeToMinutes(breakEnd);
       if (beMin <= bsMin) {
-        setErrorMsg('Pauze eindtijd moet na de pauze starttijd liggen.');
+        setErrorMsg(
+          isNl
+            ? 'Pauze eindtijd moet na de pauze starttijd liggen.'
+            : 'Break end time must be after the break start time.'
+        );
         return;
       }
     }
@@ -349,10 +358,16 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  {mode === 'create' ? 'Beschikbare Werktijd Invoeren' : 'Werktijdblok Aanpassen'}
+                  {mode === 'create'
+                    ? isNl
+                      ? 'Beschikbare Werktijd Invoeren'
+                      : 'Enter Available Working Hours'
+                    : isNl
+                    ? 'Werktijdblok Aanpassen'
+                    : 'Edit Working Time Block'}
                 </h3>
                 <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
-                  Google Calendar Stijl
+                  {isNl ? 'Google Calendar Stijl' : 'Google Calendar Style'}
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5 font-medium">
@@ -381,9 +396,13 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
               <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
               <div>
-                <span className="font-bold block">Vast Weekrooster Blok</span>
+                <span className="font-bold block">
+                  {isNl ? 'Vast Weekrooster Blok' : 'Fixed Weekly Schedule Block'}
+                </span>
                 <span>
-                  Dit blok is overgenomen van je wekelijkse rooster. Als je dit wijzigt, wordt deze specifieke datum ({formatFullHumanDate(dateStr)}) direct aangepast zonder andere weken te verstoren.
+                  {isNl
+                    ? `Dit blok is overgenomen van je wekelijkse rooster. Als je dit wijzigt, wordt deze specifieke datum (${formatFullHumanDate(dateStr)}) direct aangepast zonder andere weken te verstoren.`
+                    : `This block is inherited from your weekly schedule. Modifying it will customize this specific date (${formatFullHumanDate(dateStr)}) without affecting other weeks.`}
                 </span>
               </div>
             </div>
@@ -394,10 +413,10 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
                 <Clock className="h-4 w-4 text-emerald-600" />
-                Werktijd & Uren
+                {isNl ? 'Werktijd & Uren' : 'Working Hours'}
               </span>
               <span className="text-xs font-bold text-emerald-800 bg-emerald-200/80 px-2.5 py-1 rounded-lg">
-                Totaal: {calculateTotalHours()}
+                {isNl ? 'Totaal' : 'Total'}: {calculateTotalHours()}
               </span>
             </div>
 
@@ -405,14 +424,14 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               {/* Start Time Stepper */}
               <div className="bg-white rounded-xl border border-emerald-200 p-3 shadow-2xs">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Starttijd
+                  {isNl ? 'Starttijd' : 'Start Time'}
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleAdjustStart(-15)}
                     className="h-11 w-11 rounded-xl bg-slate-100 hover:bg-emerald-100 active:bg-emerald-200 text-slate-800 font-bold text-xs flex items-center justify-center transition border border-slate-200 touch-manipulation active:scale-95"
-                    title="-15 minuten"
+                    title={isNl ? '-15 minuten' : '-15 minutes'}
                   >
                     -15m
                   </button>
@@ -427,7 +446,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                     type="button"
                     onClick={() => handleAdjustStart(15)}
                     className="h-11 w-11 rounded-xl bg-slate-100 hover:bg-emerald-100 active:bg-emerald-200 text-slate-800 font-bold text-xs flex items-center justify-center transition border border-slate-200 touch-manipulation active:scale-95"
-                    title="+15 minuten"
+                    title={isNl ? '+15 minuten' : '+15 minutes'}
                   >
                     +15m
                   </button>
@@ -437,14 +456,14 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               {/* End Time Stepper */}
               <div className="bg-white rounded-xl border border-emerald-200 p-3 shadow-2xs">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Eindtijd
+                  {isNl ? 'Eindtijd' : 'End Time'}
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleAdjustEnd(-15)}
                     className="h-11 w-11 rounded-xl bg-slate-100 hover:bg-emerald-100 active:bg-emerald-200 text-slate-800 font-bold text-xs flex items-center justify-center transition border border-slate-200 touch-manipulation active:scale-95"
-                    title="-15 minuten"
+                    title={isNl ? '-15 minuten' : '-15 minutes'}
                   >
                     -15m
                   </button>
@@ -459,7 +478,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                     type="button"
                     onClick={() => handleAdjustEnd(15)}
                     className="h-11 w-11 rounded-xl bg-slate-100 hover:bg-emerald-100 active:bg-emerald-200 text-slate-800 font-bold text-xs flex items-center justify-center transition border border-slate-200 touch-manipulation active:scale-95"
-                    title="+15 minuten"
+                    title={isNl ? '+15 minuten' : '+15 minutes'}
                   >
                     +15m
                   </button>
@@ -470,17 +489,17 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             {/* 1-Tap Quick Duration Pills */}
             <div>
               <span className="block text-[11px] font-bold text-slate-600 mb-1.5">
-                Snelle Tijdsduur (vanaf starttijd):
+                {isNl ? 'Snelle Tijdsduur (vanaf starttijd):' : 'Quick Duration (from start time):'}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { label: '+30m', mins: 30 },
                   { label: '+45m', mins: 45 },
-                  { label: '+1 uur', mins: 60 },
-                  { label: '+1,5 uur', mins: 90 },
-                  { label: '+2 uur', mins: 120 },
-                  { label: '+4 uur', mins: 240 },
-                  { label: '+8 uur', mins: 480 },
+                  { label: isNl ? '+1 uur' : '+1h', mins: 60 },
+                  { label: isNl ? '+1,5 uur' : '+1.5h', mins: 90 },
+                  { label: isNl ? '+2 uur' : '+2h', mins: 120 },
+                  { label: isNl ? '+4 uur' : '+4h', mins: 240 },
+                  { label: isNl ? '+8 uur' : '+8h', mins: 480 },
                 ].map((item) => (
                   <button
                     key={item.mins}
@@ -496,14 +515,14 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                   onClick={() => setEndTime('17:30')}
                   className="rounded-lg bg-white border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 active:bg-emerald-200 transition shadow-2xs touch-manipulation active:scale-95"
                 >
-                  Tot 17:30
+                  {isNl ? 'Tot 17:30' : 'Until 17:30'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEndTime('20:00')}
                   className="rounded-lg bg-white border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 active:bg-emerald-200 transition shadow-2xs touch-manipulation active:scale-95"
                 >
-                  Tot 20:00
+                  {isNl ? 'Tot 20:00' : 'Until 20:00'}
                 </button>
               </div>
             </div>
@@ -512,7 +531,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
           {/* 1-Tap Quick Presets */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
-              Snelle Dagtemplates (1-Tik)
+              {isNl ? 'Snelle Dagtemplates (1-Tik)' : 'Quick Day Templates (1-Tap)'}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
@@ -520,7 +539,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 onClick={() => applyPreset('08:30', '17:30', '12:30', '13:15')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50 hover:border-emerald-300 text-left transition touch-manipulation active:scale-95"
               >
-                <div className="text-xs font-bold text-slate-900">☀️ Hele Dag</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {isNl ? '☀️ Hele Dag' : '☀️ Full Day'}
+                </div>
                 <div className="text-[10px] text-slate-500 font-medium">08:30 - 17:30</div>
               </button>
               <button
@@ -528,7 +549,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 onClick={() => applyPreset('08:30', '12:30')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50 hover:border-emerald-300 text-left transition touch-manipulation active:scale-95"
               >
-                <div className="text-xs font-bold text-slate-900">🌅 Ochtend</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {isNl ? '🌅 Ochtend' : '🌅 Morning'}
+                </div>
                 <div className="text-[10px] text-slate-500 font-medium">08:30 - 12:30</div>
               </button>
               <button
@@ -536,7 +559,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 onClick={() => applyPreset('13:00', '17:30')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50 hover:border-emerald-300 text-left transition touch-manipulation active:scale-95"
               >
-                <div className="text-xs font-bold text-slate-900">☕ Middag</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {isNl ? '☕ Middag' : '☕ Afternoon'}
+                </div>
                 <div className="text-[10px] text-slate-500 font-medium">13:00 - 17:30</div>
               </button>
               <button
@@ -544,7 +569,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 onClick={() => applyPreset('17:00', '21:00')}
                 className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50 hover:border-emerald-300 text-left transition touch-manipulation active:scale-95"
               >
-                <div className="text-xs font-bold text-slate-900">🌙 Avond</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {isNl ? '🌙 Avond' : '🌙 Evening'}
+                </div>
                 <div className="text-[10px] text-slate-500 font-medium">17:00 - 21:00</div>
               </button>
             </div>
@@ -555,7 +582,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Coffee className="h-4 w-4 text-amber-600" />
-                <span className="text-xs font-bold text-slate-900">Pauze inplannen</span>
+                <span className="text-xs font-bold text-slate-900">
+                  {isNl ? 'Pauze inplannen' : 'Schedule Break'}
+                </span>
               </div>
               <button
                 type="button"
@@ -566,7 +595,13 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {hasBreak ? 'Pauze Actief ✓' : '+ Pauze toevoegen'}
+                {hasBreak
+                  ? isNl
+                    ? 'Pauze Actief ✓'
+                    : 'Break Active ✓'
+                  : isNl
+                  ? '+ Pauze toevoegen'
+                  : '+ Add Break'}
               </button>
             </div>
 
@@ -574,7 +609,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 animate-in fade-in">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Pauze Start
+                    {isNl ? 'Pauze Start' : 'Break Start'}
                   </label>
                   <input
                     type="time"
@@ -585,7 +620,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Pauze Eind
+                    {isNl ? 'Pauze Eind' : 'Break End'}
                   </label>
                   <input
                     type="time"
@@ -604,7 +639,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               <div className="flex items-center gap-2">
                 <Sliders className="h-4 w-4 text-emerald-600" />
                 <span className="text-xs font-bold text-slate-900">
-                  Tijdsblokduur & Tussenruimte (Sessies)
+                  {isNl
+                    ? 'Tijdsblokduur & Tussenruimte (Sessies)'
+                    : 'Slot Duration & Buffer Time (Sessions)'}
                 </span>
               </div>
               <button
@@ -616,7 +653,13 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                {useCustomSlotConfig ? 'Afwijkend ✓' : 'Volg trainer standaard'}
+                {useCustomSlotConfig
+                  ? isNl
+                    ? 'Afwijkend ✓'
+                    : 'Custom ✓'
+                  : isNl
+                  ? 'Volg trainer standaard'
+                  : 'Follow trainer default'}
               </button>
             </div>
 
@@ -624,7 +667,19 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               <div className="flex items-center gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200">
                 <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                 <span>
-                  Volgt standaard instellingen van trainer: <strong>{defaultTrainerSlot} min</strong> per blok + <strong>{defaultTrainerBuffer} min</strong> tussentijd.
+                  {isNl ? (
+                    <>
+                      Volgt standaard instellingen van trainer:{' '}
+                      <strong>{defaultTrainerSlot} min</strong> per blok +{' '}
+                      <strong>{defaultTrainerBuffer} min</strong> tussentijd.
+                    </>
+                  ) : (
+                    <>
+                      Follows trainer default settings:{' '}
+                      <strong>{defaultTrainerSlot} min</strong> per slot +{' '}
+                      <strong>{defaultTrainerBuffer} min</strong> buffer time.
+                    </>
+                  )}
                 </span>
               </div>
             ) : (
@@ -632,7 +687,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Blokduur per sessie
+                      {isNl ? 'Blokduur per sessie' : 'Slot duration per session'}
                     </label>
                     <select
                       value={customSlotDuration}
@@ -648,36 +703,44 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                       }}
                       className="w-full h-10 rounded-xl border border-slate-200 px-2.5 text-xs font-bold text-slate-900 bg-white focus:border-emerald-500 focus:outline-hidden"
                     >
-                      <option value="15">15 minuten</option>
-                      <option value="30">30 minuten</option>
-                      <option value="45">45 minuten</option>
-                      <option value="60">60 minuten (1 uur)</option>
-                      <option value="75">75 minuten</option>
-                      <option value="90">90 minuten (1,5 uur)</option>
-                      <option value="120">120 minuten (2 uur)</option>
+                      <option value="15">{isNl ? '15 minuten' : '15 minutes'}</option>
+                      <option value="30">{isNl ? '30 minuten' : '30 minutes'}</option>
+                      <option value="45">{isNl ? '45 minuten' : '45 minutes'}</option>
+                      <option value="60">
+                        {isNl ? '60 minuten (1 uur)' : '60 minutes (1 hour)'}
+                      </option>
+                      <option value="75">{isNl ? '75 minuten' : '75 minutes'}</option>
+                      <option value="90">
+                        {isNl ? '90 minuten (1,5 uur)' : '90 minutes (1.5 hours)'}
+                      </option>
+                      <option value="120">
+                        {isNl ? '120 minuten (2 uur)' : '120 minutes (2 hours)'}
+                      </option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Tussenruimte / Buffertijd
+                      {isNl ? 'Tussenruimte / Buffertijd' : 'Buffer / Rest Time'}
                     </label>
                     <select
                       value={customBufferMinutes}
                       onChange={(e) => setCustomBufferMinutes(Number(e.target.value))}
                       className="w-full h-10 rounded-xl border border-slate-200 px-2.5 text-xs font-bold text-slate-900 bg-white focus:border-emerald-500 focus:outline-hidden"
                     >
-                      <option value="0">0 minuten (geen)</option>
-                      <option value="5">5 minuten</option>
-                      <option value="10">10 minuten</option>
-                      <option value="15">15 minuten</option>
-                      <option value="20">20 minuten</option>
-                      <option value="30">30 minuten</option>
-                      <option value="45">45 minuten</option>
+                      <option value="0">{isNl ? '0 minuten (geen)' : '0 minutes (none)'}</option>
+                      <option value="5">{isNl ? '5 minuten' : '5 minutes'}</option>
+                      <option value="10">{isNl ? '10 minuten' : '10 minutes'}</option>
+                      <option value="15">{isNl ? '15 minuten' : '15 minutes'}</option>
+                      <option value="20">{isNl ? '20 minuten' : '20 minutes'}</option>
+                      <option value="30">{isNl ? '30 minuten' : '30 minutes'}</option>
+                      <option value="45">{isNl ? '45 minuten' : '45 minutes'}</option>
                     </select>
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Hiermee worden de afzonderlijke tijdsblokken nauwkeurig op de kalender gepositioneerd.
+                  {isNl
+                    ? 'Hiermee worden de afzonderlijke tijdsblokken nauwkeurig op de kalender gepositioneerd.'
+                    : 'This accurately positions the individual time slots on the calendar.'}
                 </p>
               </div>
             )}
@@ -686,7 +749,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
             {previewSlots.length > 0 && (
               <div className="pt-2 border-t border-slate-200/80">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                  Resultaat op kalender ({previewSlots.filter((p) => p.type === 'slot').length} boekbare tijdsblokken):
+                  {isNl
+                    ? `Resultaat op kalender (${previewSlots.filter((p) => p.type === 'slot').length} boekbare tijdsblokken):`
+                    : `Result on calendar (${previewSlots.filter((p) => p.type === 'slot').length} bookable time slots):`}
                 </span>
                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-white rounded-xl border border-slate-200/80">
                   {previewSlots.map((item, idx) => {
@@ -708,7 +773,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                           className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-lg flex items-center gap-1"
                         >
                           <Coffee className="h-2.5 w-2.5 text-purple-600" />
-                          Pauze {item.startStr} - {item.endStr}
+                          {isNl ? 'Pauze' : 'Break'} {item.startStr} - {item.endStr}
                         </span>
                       );
                     }
@@ -717,7 +782,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                         key={idx}
                         className="text-[9px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-lg"
                       >
-                        +{item.duration}m rust
+                        +{item.duration}m {isNl ? 'rust' : 'buffer'}
                       </span>
                     );
                   })}
@@ -737,10 +802,14 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               />
               <div>
                 <span className="text-xs font-bold text-slate-900 block">
-                  Toepassen op alle werkdagen van deze week (Ma t/m Vr)
+                  {isNl
+                    ? 'Toepassen op alle werkdagen van deze week (Ma t/m Vr)'
+                    : 'Apply to all weekdays of this week (Mon - Fri)'}
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-0.5">
-                  Kopieert dit werktijdenblok automatisch naar de andere doordeweekse dagen van deze week.
+                  {isNl
+                    ? 'Kopieert dit werktijdenblok automatisch naar de andere doordeweekse dagen van deze week.'
+                    : 'Automatically copies this working block to the other weekdays of this week.'}
                 </span>
               </div>
             </label>
@@ -752,7 +821,9 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               <div className="flex items-center gap-2 min-w-0">
                 <Palmtree className="h-4 w-4 text-amber-600 shrink-0" />
                 <span className="text-xs font-semibold text-amber-900 truncate">
-                  Liever deze dag blokkeren wegens vakantie of verlof?
+                  {isNl
+                    ? 'Liever deze dag blokkeren wegens vakantie of verlof?'
+                    : 'Prefer to block this day for vacation or time off?'}
                 </span>
               </div>
               <button
@@ -763,7 +834,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 }}
                 className="shrink-0 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-3 py-1.5 transition shadow-2xs"
               >
-                🌴 Vakantie Inplannen
+                {isNl ? '🌴 Vakantie Inplannen' : '🌴 Plan Vacation'}
               </button>
             </div>
           )}
@@ -779,7 +850,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                 className="h-11 rounded-xl bg-rose-50 border border-rose-200 px-4 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition flex items-center gap-1.5 touch-manipulation active:scale-95 shadow-2xs"
               >
                 <Trash2 className="h-4 w-4" />
-                <span>Blok Verwijderen (Vrijmaken)</span>
+                <span>{isNl ? 'Blok Verwijderen (Vrijmaken)' : 'Delete Block (Mark Off)'}</span>
               </button>
             )}
           </div>
@@ -790,7 +861,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               onClick={onClose}
               className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-100 transition touch-manipulation active:scale-95"
             >
-              Annuleren
+              {isNl ? 'Annuleren' : 'Cancel'}
             </button>
             <button
               type="button"
@@ -798,7 +869,15 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
               className="h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 px-5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-2 touch-manipulation active:scale-95"
             >
               <Check className="h-4 w-4" />
-              <span>{mode === 'create' ? 'Werktijd Toevoegen' : 'Wijzigingen Opslaan'}</span>
+              <span>
+                {mode === 'create'
+                  ? isNl
+                    ? 'Werktijd Toevoegen'
+                    : 'Add Working Hours'
+                  : isNl
+                  ? 'Wijzigingen Opslaan'
+                  : 'Save Changes'}
+              </span>
             </button>
           </div>
         </div>

@@ -61,9 +61,16 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
     setAvailabilityMode,
     deleteAdHocBlock,
     deleteTrainerAccount,
+    clearDemoData,
+    resetDemoData,
     language,
     t,
   } = useBooking();
+
+  // Demo data clear / restore state
+  const [isClearDemoModalOpen, setIsClearDemoModalOpen] = useState(false);
+  const [isClearingDemo, setIsClearingDemo] = useState(false);
+  const [demoActionBanner, setDemoActionBanner] = useState<string | null>(null);
 
   // Account deletion modal state
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
@@ -329,13 +336,17 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
     setIsServiceModalOpen(false);
   };
 
+  const isNl = language === 'nl';
+
   return (
     <div className="space-y-6">
       {/* Saved Banner */}
       {savedBanner && (
         <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-bold text-emerald-900 shadow-xs">
           <Check className="h-4 w-4 text-emerald-600" />
-          Settings saved successfully! Availability & booking slots are refreshed.
+          {isNl
+            ? 'Instellingen succesvol opgeslagen! Beschikbaarheid en tijdsloten zijn bijgewerkt.'
+            : 'Settings saved successfully! Availability & booking slots are refreshed.'}
         </div>
       )}
 
@@ -347,7 +358,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               {t.providerProfile} & {t.cancellationPolicy}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Configure your default hourly tariff, buffer between appointments, and cancellation rules.
+              {isNl
+                ? 'Stel je standaard uurtarief, buffertijd tussen afspraken en annuleringsregels in.'
+                : 'Configure your default hourly tariff, buffer between appointments, and cancellation rules.'}
             </p>
           </div>
           <button
@@ -397,12 +410,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
             >
               {CURRENCY_OPTIONS.map((opt) => (
                 <option key={opt.code} value={opt.code}>
-                  {opt.labelEn} / {opt.labelNl}
+                  {isNl ? opt.labelNl : opt.labelEn}
                 </option>
               ))}
             </select>
             <p className="text-[11px] text-slate-500 mt-1">
-              Active: <strong className="text-emerald-700 font-semibold">{profileForm.currency}</strong> ({getCurrencySymbol(profileForm.currency as SupportedCurrency)})
+              {isNl ? 'Actief:' : 'Active:'}{' '}
+              <strong className="text-emerald-700 font-semibold">{profileForm.currency}</strong> ({getCurrencySymbol(profileForm.currency as SupportedCurrency)})
             </p>
           </div>
 
@@ -426,53 +440,57 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Base hourly rate. Scales with duration.
+              {isNl ? 'Standaard uurtarief. Schaalt mee met de sessieduur.' : 'Base hourly rate. Scales with duration.'}
             </p>
           </div>
 
           {/* Standard Slot Duration */}
           <div>
             <label className="block font-bold text-slate-700 mb-1.5">
-              Standaard Tijdsblokduur (Sessieduur)
+              {isNl ? 'Standaard Tijdsblokduur (Sessieduur)' : 'Standard Slot Duration (Session Length)'}
             </label>
             <select
               value={profileForm.standardSlotDuration}
               onChange={(e) => setProfileForm({ ...profileForm, standardSlotDuration: Number(e.target.value) })}
               className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white"
             >
-              <option value="15">15 minuten</option>
-              <option value="30">30 minuten</option>
-              <option value="45">45 minuten</option>
-              <option value="60">60 minuten (1 uur - standaard)</option>
-              <option value="75">75 minuten (1u 15m)</option>
-              <option value="90">90 minuten (1,5 uur)</option>
-              <option value="120">120 minuten (2 uur)</option>
+              <option value="15">{isNl ? '15 minuten' : '15 minutes'}</option>
+              <option value="30">{isNl ? '30 minuten' : '30 minutes'}</option>
+              <option value="45">{isNl ? '45 minuten' : '45 minutes'}</option>
+              <option value="60">{isNl ? '60 minuten (1 uur - standaard)' : '60 minutes (1 hour - default)'}</option>
+              <option value="75">{isNl ? '75 minuten (1u 15m)' : '75 minutes (1h 15m)'}</option>
+              <option value="90">{isNl ? '90 minuten (1,5 uur)' : '90 minutes (1.5 hours)'}</option>
+              <option value="120">{isNl ? '120 minuten (2 uur)' : '120 minutes (2 hours)'}</option>
             </select>
             <p className="text-[11px] text-slate-400 mt-1">
-              Bepaalt hoe lang een standaard boekbaar tijdsblok duurt.
+              {isNl
+                ? 'Bepaalt hoe lang een standaard boekbaar tijdsblok duurt.'
+                : 'Determines the length of a standard bookable time slot.'}
             </p>
           </div>
 
           {/* Buffer Time (FR-1.4) */}
           <div>
             <label className="block font-bold text-slate-700 mb-1.5">
-              Tussenruimte / Buffertijd tussen blokken
+              {isNl ? 'Tussenruimte / Buffertijd tussen blokken' : 'Buffer Time Between Slots'}
             </label>
             <select
               value={profileForm.bufferMinutes}
               onChange={(e) => setProfileForm({ ...profileForm, bufferMinutes: Number(e.target.value) })}
               className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white"
             >
-              <option value="0">0 minuten (geen tussentijd)</option>
-              <option value="5">5 minuten</option>
-              <option value="10">10 minuten</option>
-              <option value="15">15 minuten (aanbevolen)</option>
-              <option value="20">20 minuten</option>
-              <option value="30">30 minuten</option>
-              <option value="45">45 minuten</option>
+              <option value="0">{isNl ? '0 minuten (geen tussentijd)' : '0 minutes (no buffer)'}</option>
+              <option value="5">{isNl ? '5 minuten' : '5 minutes'}</option>
+              <option value="10">{isNl ? '10 minuten' : '10 minutes'}</option>
+              <option value="15">{isNl ? '15 minuten (aanbevolen)' : '15 minutes (recommended)'}</option>
+              <option value="20">{isNl ? '20 minuten' : '20 minutes'}</option>
+              <option value="30">{isNl ? '30 minuten' : '30 minutes'}</option>
+              <option value="45">{isNl ? '45 minuten' : '45 minutes'}</option>
             </select>
             <p className="text-[11px] text-slate-400 mt-1">
-              Rust- of reistijd die automatisch tussen afzonderlijke blokken wordt vrijgehouden.
+              {isNl
+                ? 'Rust- of reistijd die automatisch tussen afzonderlijke blokken wordt vrijgehouden.'
+                : 'Rest or travel time automatically reserved between consecutive slots.'}
             </p>
           </div>
         </div>
@@ -502,7 +520,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   }
                   className="w-28 rounded-xl border border-slate-200 p-2 text-slate-900 bg-white focus:border-emerald-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 transition"
                 />
-                <span className="text-slate-500 font-medium">hours before appointment start</span>
+                <span className="text-slate-500 font-medium">
+                  {isNl ? 'uur vóór aanvang van de afspraak' : 'hours before appointment start'}
+                </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
                 {t.cancellationWindowHelp}
@@ -527,7 +547,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 </span>
               </label>
               <p className="text-[11px] text-slate-400 mt-1">
-                When enabled, clients can cancel anytime without restriction (FR-6.3).
+                {isNl
+                  ? 'Indien ingeschakeld kunnen cliënten op elk moment zonder tijdslimiet annuleren.'
+                  : 'When enabled, clients can cancel anytime without restriction (FR-6.3).'}
               </p>
             </div>
           </div>
@@ -541,7 +563,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
             {t.availabilityStrategy}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Standaard werkt je agenda met flexibele Ad Hoc Planning. Wil je een vast weekrooster hanteren voor een bepaalde periode? Klik dan op Vast Weekrooster (Fixed Schedule) om de exacte start- en einddatum te kiezen.
+            {isNl
+              ? 'Standaard werkt je agenda met flexibele Ad Hoc Planning. Wil je een vast weekrooster hanteren voor een bepaalde periode? Klik dan op Vast Weekrooster (Fixed Schedule) om de exacte start- en einddatum te kiezen.'
+              : 'By default, your calendar uses flexible Ad Hoc Planning. Want to apply a recurring weekly schedule for a specific period? Click Fixed Weekly Schedule to choose the exact start and end dates.'}
           </p>
         </div>
 
@@ -559,16 +583,18 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                     {t.adhocScheduleMode || 'Ad Hoc Planning'}
                   </h4>
                   <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Standaard Actief
+                    {isNl ? 'Standaard Actief' : 'Default Active'}
                   </span>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                <Check className="h-3 w-3" /> Standaard
+                <Check className="h-3 w-3" /> {isNl ? 'Standaard' : 'Default'}
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-1">
-              Je plant en wijzigt je werktijden direct op de kalender per dag of tijdvak.
+              {isNl
+                ? 'Je plant en wijzigt je werktijden direct op de kalender per dag of tijdvak.'
+                : 'Schedule and adjust your working hours directly on the calendar by date or time block.'}
             </p>
           </div>
 
@@ -584,19 +610,21 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">
-                    {t.weeklyScheduleMode || 'Vast Weekrooster (Fixed Schedule)'}
+                    {t.weeklyScheduleMode || (isNl ? 'Vast Weekrooster (Fixed Schedule)' : 'Fixed Weekly Schedule')}
                   </h4>
                   <span className="text-[11px] text-slate-500 font-medium">
-                    Kies startdatum t/m einddatum
+                    {isNl ? 'Kies startdatum t/m einddatum' : 'Select start date to end date'}
                   </span>
                 </div>
               </div>
               <span className="rounded-xl bg-slate-900 group-hover:bg-emerald-600 text-white px-3 py-1 text-[11px] font-bold transition shadow-2xs">
-                Periode Kiezen →
+                {isNl ? 'Periode Kiezen →' : 'Select Range →'}
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-1">
-              Klik hier om in een popupscherm aan te geven vanaf welke startdatum tot en met welke einddatum je jouw vaste weekrooster wilt toepassen.
+              {isNl
+                ? 'Klik hier om in een popupscherm aan te geven vanaf welke startdatum tot en met welke einddatum je jouw vaste weekrooster wilt toepassen.'
+                : 'Click here to open a modal and select the exact start date and end date for applying your recurring weekly schedule.'}
             </p>
           </div>
         </div>
@@ -610,10 +638,12 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               </div>
               <div>
                 <h4 className="text-sm font-bold text-emerald-950">
-                  Ad Hoc Planning is standaard actief
+                  {isNl ? 'Ad Hoc Planning is standaard actief' : 'Ad Hoc Planning is active by default'}
                 </h4>
                 <p className="text-xs text-emerald-800 mt-0.5">
-                  Je kunt je beschikbaarheid direct op de kalender aanpassen of met één klik een vast weekrooster uitrollen over een gekozen periode.
+                  {isNl
+                    ? 'Je kunt je beschikbaarheid direct op de kalender aanpassen of met één klik een vast weekrooster uitrollen over een gekozen periode.'
+                    : 'Adjust your availability directly on the calendar or roll out a fixed weekly schedule across a selected period with one click.'}
                 </p>
               </div>
             </div>
@@ -625,7 +655,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 className="rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 <CalendarRange className="h-3.5 w-3.5 text-emerald-600" />
-                Vast Weekrooster (Periode)
+                {isNl ? 'Vast Weekrooster (Periode)' : 'Fixed Schedule (Date Range)'}
               </button>
               {onNavigate && (
                 <button
@@ -634,7 +664,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 shadow-xs transition flex items-center gap-1.5"
                 >
                   <Calendar className="h-3.5 w-3.5 text-emerald-400" />
-                  Open Kalender
+                  {isNl ? 'Open Kalender' : 'Open Calendar'}
                 </button>
               )}
               <button
@@ -646,7 +676,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 shadow-xs transition flex items-center gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Datum Toevoegen
+                {isNl ? 'Datum Toevoegen' : 'Add Date'}
               </button>
             </div>
           </div>
@@ -655,7 +685,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Ingeplande Dagen & Werktijden ({settings.adHocSchedule?.length || 0})
+                {isNl
+                  ? `Ingeplande Dagen & Werktijden (${settings.adHocSchedule?.length || 0})`
+                  : `Scheduled Days & Working Hours (${settings.adHocSchedule?.length || 0})`}
               </h4>
               <button
                 type="button"
@@ -665,17 +697,21 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 }}
                 className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition"
               >
-                + Nieuwe datum plannen
+                {isNl ? '+ Nieuwe datum plannen' : '+ Schedule new date'}
               </button>
             </div>
 
             {(!settings.adHocSchedule || settings.adHocSchedule.length === 0) ? (
               <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
                 <p className="text-xs font-semibold text-slate-500">
-                  Er zijn nog geen ad hoc werkdagen ingevoerd.
+                  {isNl
+                    ? 'Er zijn nog geen ad hoc werkdagen ingevoerd.'
+                    : 'No ad hoc working days have been scheduled yet.'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Open de kalender, klik op 'Datum Toevoegen' of pas een Vast Weekrooster toe voor een periode.
+                  {isNl
+                    ? "Open de kalender, klik op 'Datum Toevoegen' of pas een Vast Weekrooster toe voor een periode."
+                    : "Open the calendar, click 'Add Date', or apply a Fixed Weekly Schedule for a date range."}
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <button
@@ -687,7 +723,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-xs"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Vandaag Inplannen (08:30 - 17:30)
+                    {isNl ? 'Vandaag Inplannen (08:30 - 17:30)' : 'Schedule Today (08:30 - 17:30)'}
                   </button>
                   <button
                     type="button"
@@ -695,7 +731,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                     className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition shadow-2xs"
                   >
                     <CalendarRange className="h-3.5 w-3.5 text-emerald-600" />
-                    Vast Weekrooster Toepassen
+                    {isNl ? 'Vast Weekrooster Toepassen' : 'Apply Fixed Weekly Schedule'}
                   </button>
                 </div>
               </div>
@@ -720,7 +756,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                               setIsAdHocModalOpen(true);
                             }}
                             className="p-1 text-slate-400 hover:text-emerald-600 transition"
-                            title="Bewerken"
+                            title={isNl ? 'Bewerken' : 'Edit'}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
@@ -728,7 +764,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                             type="button"
                             onClick={() => deleteAdHocBlock(block.id)}
                             className="p-1 text-slate-400 hover:text-rose-600 transition"
-                            title="Verwijderen"
+                            title={isNl ? 'Verwijderen' : 'Delete'}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -742,7 +778,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                         </span>
                         {block.breakStart && (
                           <span className="text-[10px] text-slate-500 font-normal">
-                            Pauze: {block.breakStart}-{block.breakEnd}
+                            {isNl ? 'Pauze:' : 'Break:'} {block.breakStart}-{block.breakEnd}
                           </span>
                         )}
                       </div>
@@ -768,7 +804,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               {t.servicesTitle}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Define service types with distinct durations and automatic slot subdividing (FR-2.2 & FR-2.3).
+              {isNl
+                ? 'Definieer diensttypes met eigen duur en automatische tijdsblok-indeling.'
+                : 'Define service types with distinct durations and automatic slot subdividing (FR-2.2 & FR-2.3).'}
             </p>
           </div>
           <button
@@ -799,7 +837,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">{srv.description}</p>
                 <div className="text-xs font-bold text-slate-800 pt-0.5">
-                  Default Fee: {formatPrice(srv.basePrice || settings.standardHourlyRate)}
+                  {isNl ? 'Standaardtarief:' : 'Default Fee:'} {formatPrice(srv.basePrice || settings.standardHourlyRate)}
                 </div>
               </div>
 
@@ -830,7 +868,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               {t.exceptionsTitle}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Block calendar dates for vacations, training workshops, or sickness. No slots will be generated on these days.
+              {isNl
+                ? 'Blokkeer kalenderdagen voor vakantie, bijscholing of ziekte. Op deze dagen worden geen boekbare tijdsloten gegenereerd.'
+                : 'Block calendar dates for vacations, training workshops, or sickness. No slots will be generated on these days.'}
             </p>
           </div>
           <button
@@ -843,7 +883,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
         </div>
 
         {exceptions.length === 0 ? (
-          <p className="text-xs text-slate-400 py-3">No blocked date exceptions configured.</p>
+          <p className="text-xs text-slate-400 py-3">
+            {isNl ? 'Geen geblokkeerde datums of vakanties ingesteld.' : 'No blocked date exceptions configured.'}
+          </p>
         ) : (
           <div className="space-y-2.5">
             {exceptions.map((exc) => (
@@ -854,7 +896,8 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 <div>
                   <div className="font-bold text-sm">{exc.title}</div>
                   <div className="text-amber-800 mt-0.5">
-                    {exc.startDate} to {exc.endDate} • Reason: <span className="font-semibold">{exc.reason.toUpperCase()}</span>
+                    {exc.startDate} {isNl ? 't/m' : 'to'} {exc.endDate} • {isNl ? 'Reden:' : 'Reason:'}{' '}
+                    <span className="font-semibold">{exc.reason.toUpperCase()}</span>
                     {exc.notes && ` (${exc.notes})`}
                   </div>
                 </div>
@@ -862,14 +905,14 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   <button
                     onClick={() => handleOpenEditException(exc)}
                     className="text-amber-700 hover:text-slate-900 p-1.5 rounded-lg hover:bg-amber-100 transition"
-                    title="Edit exception"
+                    title={isNl ? 'Uitzondering bewerken' : 'Edit exception'}
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => deleteException(exc.id)}
                     className="text-amber-700 hover:text-rose-600 p-1.5 rounded-lg hover:bg-amber-100 transition"
-                    title="Remove exception"
+                    title={isNl ? 'Uitzondering verwijderen' : 'Remove exception'}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -890,7 +933,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   <Palmtree className="h-4 w-4" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
-                  {editingExceptionId ? 'Blokkade / Vakantie Bewerken' : t.addException}
+                  {editingExceptionId
+                    ? isNl
+                      ? 'Blokkade / Vakantie Bewerken'
+                      : 'Edit Exception / Holiday'
+                    : t.addException}
                 </h3>
               </div>
               <button
@@ -903,11 +950,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
             <form onSubmit={handleAddException} className="space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Title / Description</label>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  {isNl ? 'Titel / Omschrijving' : 'Title / Description'}
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Summer Holiday, Coaching Seminar"
+                  placeholder={isNl ? 'bijv. Zomervakantie, Bijscholing' : 'e.g., Summer Holiday, Coaching Seminar'}
                   value={newException.title}
                   onChange={(e) => setNewException({ ...newException, title: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -916,7 +965,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1.5">Start Date</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    {isNl ? 'Startdatum' : 'Start Date'}
+                  </label>
                   <input
                     type="date"
                     required
@@ -926,7 +977,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1.5">End Date</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    {isNl ? 'Einddatum' : 'End Date'}
+                  </label>
                   <input
                     type="date"
                     required
@@ -949,10 +1002,10 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   }
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white"
                 >
-                  <option value="vacation">Vacation / Holiday</option>
-                  <option value="sick">Sick leave</option>
-                  <option value="personal">Personal time off</option>
-                  <option value="blocked">One-off Blocked</option>
+                  <option value="vacation">{isNl ? 'Vakantie / Verlof' : 'Vacation / Holiday'}</option>
+                  <option value="sick">{isNl ? 'Ziekteverlof' : 'Sick leave'}</option>
+                  <option value="personal">{isNl ? 'Persoonlijk vrij' : 'Personal time off'}</option>
+                  <option value="blocked">{isNl ? 'Eenmalige blokkade' : 'One-off Blocked'}</option>
                 </select>
               </div>
 
@@ -968,7 +1021,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   type="submit"
                   className="rounded-xl bg-emerald-600 px-4.5 py-2 font-bold text-white hover:bg-emerald-500 transition shadow-xs"
                 >
-                  Block Dates
+                  {isNl ? 'Datums Blokkeren' : 'Block Dates'}
                 </button>
               </div>
             </form>
@@ -986,7 +1039,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   <Tag className="h-4 w-4" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
-                  {editingService ? 'Edit Service' : t.addService}
+                  {editingService ? (isNl ? 'Dienst Bewerken' : 'Edit Service') : t.addService}
                 </h3>
               </div>
               <button
@@ -999,11 +1052,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
             <form onSubmit={handleSubmitService} className="space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Service Name</label>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  {isNl ? 'Naam van Dienst' : 'Service Name'}
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Intake — 90 min"
+                  placeholder={isNl ? 'bijv. Intake — 90 min' : 'e.g., Intake — 90 min'}
                   value={serviceForm.name}
                   onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -1012,7 +1067,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1.5">Duration (Minutes)</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    {isNl ? 'Duur (Minuten)' : 'Duration (Minutes)'}
+                  </label>
                   <select
                     value={serviceForm.durationMinutes}
                     onChange={(e) =>
@@ -1022,14 +1079,16 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   >
                     <option value="30">30 min (Express)</option>
                     <option value="45">45 min</option>
-                    <option value="60">60 min (Standard)</option>
+                    <option value="60">{isNl ? '60 min (Standaard)' : '60 min (Standard)'}</option>
                     <option value="75">75 min</option>
-                    <option value="90">90 min (Intake/Extended)</option>
+                    <option value="90">{isNl ? '90 min (Intake/Uitgebreid)' : '90 min (Intake/Extended)'}</option>
                     <option value="120">120 min</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1.5">Base Price ({currencySymbol})</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    {isNl ? `Basisprijs (${currencySymbol})` : `Base Price (${currencySymbol})`}
+                  </label>
                   <input
                     type="number"
                     step="0.5"
@@ -1041,7 +1100,9 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Description</label>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  {isNl ? 'Omschrijving' : 'Description'}
+                </label>
                 <textarea
                   rows={2}
                   value={serviceForm.description}
@@ -1062,7 +1123,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   type="submit"
                   className="rounded-xl bg-emerald-600 px-4.5 py-2 font-bold text-white hover:bg-emerald-500 transition shadow-xs"
                 >
-                  Save Service
+                  {isNl ? 'Dienst Opslaan' : 'Save Service'}
                 </button>
               </div>
             </form>
@@ -1082,6 +1143,148 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
         isOpen={isFixedScheduleModalOpen}
         onClose={() => setIsFixedScheduleModalOpen(false)}
       />
+
+      {/* Demo Data & Clean App Section */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xl shadow-slate-200/40 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-emerald-400 shadow-xs">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                {isNl
+                  ? 'Demodata Wissen & Schone App'
+                  : 'Clear Demo Data & Start with a Clean App'}
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
+              {isNl
+                ? 'Nieuwe accounts starten standaard met voorbeeldgegevens (democliënten, voorbeeldafspraken, pakketten, berichten, facturen en werktijden). Wil je alle demodata wissen en met een volledig lege, schone app beginnen? Je eigen trainerprofiel en inlogaccount blijven behouden.'
+                : 'New accounts start with sample data by default (demo clients, sample appointments, packages, messages, invoices, and working hours). Want to wipe all demo data and start with a completely empty, clean app? Your own trainer profile and login account will be kept.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                resetDemoData();
+                setDemoActionBanner(
+                  isNl
+                    ? 'Voorbeeldgegevens (demodata) zijn opnieuw ingeladen.'
+                    : 'Sample demo data has been restored.'
+                );
+                setTimeout(() => setDemoActionBanner(null), 4000);
+              }}
+              className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+            >
+              {isNl ? 'Demodata Herstellen' : 'Restore Demo Data'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsClearDemoModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4 text-emerald-400" />
+              <span>
+                {isNl ? 'Demodata Wissen (Schone App)' : 'Clear Demo Data (Clean App)'}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {demoActionBanner && (
+          <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-900">
+            <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{demoActionBanner}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Clear Demo Data Confirmation Modal */}
+      {isClearDemoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {isNl
+                      ? 'Demodata Wissen & Schoon Beginnen?'
+                      : 'Clear Demo Data & Start Clean?'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isNl
+                      ? 'Je eigen trainerprofiel blijft behouden'
+                      : 'Your trainer profile will be preserved'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={() => setIsClearDemoModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed mb-5">
+              {isNl
+                ? 'Alle voorbeeldcliënten (zoals Linda de Vries en Mark Jansen), afspraken, pakketten, chatberichten, facturen, werktijden en uitzonderingen worden gewist uit de app en uit Firestore zodat je met een schone lei kunt starten.'
+                : 'All sample clients (such as Linda de Vries and Mark Jansen), appointments, packages, chat messages, invoices, working hours, and exceptions will be cleared from the app and Firestore so you can start with a clean slate.'}
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={() => setIsClearDemoModalOpen(false)}
+                className="rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={async () => {
+                  setIsClearingDemo(true);
+                  try {
+                    await clearDemoData();
+                    setIsClearDemoModalOpen(false);
+                    setDemoActionBanner(
+                      isNl
+                        ? 'Alle demodata is gewist! Je kunt nu beginnen met een schone app.'
+                        : 'All demo data has been cleared! You now have a clean app.'
+                    );
+                    setTimeout(() => setDemoActionBanner(null), 5000);
+                  } finally {
+                    setIsClearingDemo(false);
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>
+                  {isClearingDemo
+                    ? isNl
+                      ? 'Bezig met wissen...'
+                      : 'Clearing...'
+                    : isNl
+                    ? 'Ja, Wis Demodata & Start Schoon'
+                    : 'Yes, Clear Demo Data & Start Clean'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Account & Data Management (Delete Account Section) */}
       <div

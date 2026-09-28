@@ -62,8 +62,10 @@ export const CalendarView: React.FC = () => {
     getDateAvailabilityInfo,
     setAdHocBlocksForDate,
     deleteException,
+    language,
     t,
   } = useBooking();
+  const isNl = language === 'nl';
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
@@ -515,7 +517,7 @@ export const CalendarView: React.FC = () => {
             </button>
           </div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 ml-2 tracking-tight">
-            {currentDate.toLocaleDateString('en-US', {
+            {currentDate.toLocaleDateString(isNl ? 'nl-NL' : 'en-US', {
               month: 'long',
               year: 'numeric',
             })}
@@ -528,20 +530,28 @@ export const CalendarView: React.FC = () => {
           <button
             onClick={() => handleOpenAdHocModal(currentDateStr, 'vacation')}
             className="inline-flex items-center gap-1.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 text-xs font-bold shadow-md shadow-amber-500/20 transition"
-            title="Plan direct een vakantie of verlofperiode in via de kalender"
+            title={
+              isNl
+                ? 'Plan direct een vakantie of verlofperiode in via de kalender'
+                : 'Plan a vacation or time-off period directly via the calendar'
+            }
           >
             <Palmtree className="h-4 w-4" />
-            <span>{t.planVacation || 'Vakantie Inplannen'}</span>
+            <span>{t.planVacation || (isNl ? 'Vakantie Inplannen' : 'Plan Vacation')}</span>
           </button>
 
           {/* Quick Add Ad Hoc Availability button */}
           <button
             onClick={() => handleOpenAdHocModal(currentDateStr, 'availability')}
             className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/20 transition"
-            title="Beschikbaarheid voor een dag instellen of aanpassen"
+            title={
+              isNl
+                ? 'Beschikbaarheid voor een dag instellen of aanpassen'
+                : 'Set or adjust availability for a day'
+            }
           >
             <Plus className="h-4 w-4" />
-            <span>{t.addAdHocAvailability || 'Beschikbaarheid Instellen'}</span>
+            <span>{t.addAdHocAvailability || (isNl ? 'Beschikbaarheid Instellen' : 'Set Availability')}</span>
           </button>
 
           {/* Time Range Selector Popover Trigger */}
@@ -550,7 +560,11 @@ export const CalendarView: React.FC = () => {
               type="button"
               onClick={() => setIsTimeRangeMenuOpen(!isTimeRangeMenuOpen)}
               className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition shadow-2xs"
-              title="Wijzig de getoonde uren in de kalender (Standaard: 06:00 - 00:00)"
+              title={
+                isNl
+                  ? 'Wijzig de getoonde uren in de kalender (Standaard: 06:00 - 00:00)'
+                  : 'Change visible hours in the calendar (Default: 06:00 - 00:00)'
+              }
             >
               <Clock className="h-3.5 w-3.5 text-slate-500" />
               <span>{formatHourLabel(startHour)} - {formatHourLabel(endHour)}</span>
@@ -564,7 +578,7 @@ export const CalendarView: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <Sliders className="h-4 w-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-900">
-                      Kalender Tijdweergave
+                      {isNl ? 'Kalender Tijdweergave' : 'Calendar Time Range'}
                     </span>
                   </div>
                   <button
@@ -577,7 +591,9 @@ export const CalendarView: React.FC = () => {
                 </div>
 
                 <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-                  Kies welke uren zichtbaar zijn in het dag- en weekrooster.
+                  {isNl
+                    ? 'Kies welke uren zichtbaar zijn in het dag- en weekrooster.'
+                    : 'Choose which hours are visible in the day and week view.'}
                 </p>
 
                 {/* Preset Buttons */}
@@ -593,7 +609,7 @@ export const CalendarView: React.FC = () => {
                   >
                     <span>06:00 - 00:00</span>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
-                      Standaard
+                      {isNl ? 'Standaard' : 'Default'}
                     </span>
                   </button>
 
@@ -607,7 +623,9 @@ export const CalendarView: React.FC = () => {
                     }`}
                   >
                     <span>07:00 - 22:00</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Uitgebreid</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {isNl ? 'Uitgebreid' : 'Extended'}
+                    </span>
                   </button>
 
                   <button
@@ -620,18 +638,22 @@ export const CalendarView: React.FC = () => {
                     }`}
                   >
                     <span>08:00 - 20:00</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Klassiek</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {isNl ? 'Klassiek' : 'Classic'}
+                    </span>
                   </button>
                 </div>
 
                 {/* Custom Range Sliders / Inputs */}
                 <div className="pt-2 border-t border-slate-100">
                   <span className="text-[11px] font-bold text-slate-600 block mb-2">
-                    Aangepast Bereik:
+                    {isNl ? 'Aangepast Bereik:' : 'Custom Range:'}
                   </span>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1 font-semibold">Startuur</label>
+                      <label className="block text-[10px] text-slate-400 mb-1 font-semibold">
+                        {isNl ? 'Startuur' : 'Start Hour'}
+                      </label>
                       <select
                         value={startHour}
                         onChange={(e) => handleSetTimeRange(Number(e.target.value), endHour)}
@@ -645,7 +667,9 @@ export const CalendarView: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1 font-semibold">Einduur</label>
+                      <label className="block text-[10px] text-slate-400 mb-1 font-semibold">
+                        {isNl ? 'Einduur' : 'End Hour'}
+                      </label>
                       <select
                         value={endHour}
                         onChange={(e) => handleSetTimeRange(startHour, Number(e.target.value))}
@@ -653,7 +677,11 @@ export const CalendarView: React.FC = () => {
                       >
                         {Array.from({ length: 24 }).map((_, h) => (
                           <option key={h + 1} value={h + 1}>
-                            {h + 1 === 24 ? '00:00 (middernacht)' : `${String(h + 1).padStart(2, '0')}:00`}
+                            {h + 1 === 24
+                              ? isNl
+                                ? '00:00 (middernacht)'
+                                : '00:00 (midnight)'
+                              : `${String(h + 1).padStart(2, '0')}:00`}
                           </option>
                         ))}
                       </select>
@@ -709,12 +737,12 @@ export const CalendarView: React.FC = () => {
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {t.activeAvailabilityMode || 'Standaard Planningsmethode'}
+                {t.activeAvailabilityMode || (isNl ? 'Standaard Planningsmethode' : 'Active Scheduling Mode')}
               </div>
               <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="text-emerald-700 font-extrabold">
-                  {t.adhocScheduleMode || 'Ad Hoc Planning (Standaard actief)'}
+                  {t.adhocScheduleMode || (isNl ? 'Ad Hoc Planning (Standaard actief)' : 'Ad Hoc Flexible Schedule')}
                 </span>
               </div>
             </div>
@@ -724,21 +752,27 @@ export const CalendarView: React.FC = () => {
             type="button"
             onClick={() => setIsFixedScheduleModalOpen(true)}
             className="ml-0 sm:ml-2 rounded-xl border border-emerald-300 bg-emerald-50/80 hover:bg-emerald-100 px-3.5 py-1.5 text-xs font-bold text-emerald-900 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Stel een vast weekrooster in voor een specifieke startdatum t/m einddatum"
+            title={
+              isNl
+                ? 'Stel een vast weekrooster in voor een specifieke startdatum t/m einddatum'
+                : 'Set a fixed weekly schedule for a specific start date to end date'
+            }
           >
             <CalendarRange className="h-3.5 w-3.5 text-emerald-700" />
-            <span>Add Fixed Schedule</span>
+            <span>{isNl ? 'Vast Rooster Toevoegen' : 'Add Fixed Schedule'}</span>
           </button>
         </div>
 
         {/* Right: Color Legend showing exact meaning of colors on the calendar */}
         <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] font-semibold text-slate-600 bg-slate-50/90 py-2 px-3.5 rounded-2xl border border-slate-200/70">
-          <span className="text-slate-400 font-bold uppercase text-[10px]">Legenda:</span>
+          <span className="text-slate-400 font-bold uppercase text-[10px]">
+            {isNl ? 'Legenda:' : 'Legend:'}
+          </span>
           {/* Green: Available (Solid) */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-emerald-200 border-2 border-emerald-600 shadow-2xs"></span>
             <span className="text-emerald-950 font-extrabold">
-              {t.calendarAvailableTime || 'Beschikbare werktijd (Duidelijk groen)'}
+              {t.calendarAvailableTime || (isNl ? 'Beschikbare werktijd (Duidelijk groen)' : 'Available Working Hours')}
             </span>
           </span>
           {/* Purple: Pauze */}
@@ -746,25 +780,29 @@ export const CalendarView: React.FC = () => {
             <span className="h-3.5 w-3.5 rounded-md bg-purple-200 border-2 border-purple-500 shadow-2xs"></span>
             <span className="text-purple-950 font-extrabold flex items-center gap-1">
               <Coffee className="h-3 w-3 text-purple-700" />
-              Pauze / Rusttijd (Paars)
+              {isNl ? 'Pauze / Rusttijd (Paars)' : 'Break / Rest Time'}
             </span>
           </span>
           {/* Slate: Off */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-slate-100 border border-dashed border-slate-300"></span>
             <span className="text-slate-500">
-              {t.calendarUnavailableTime || 'Buiten werktijd / Vrij'}
+              {t.calendarUnavailableTime || (isNl ? 'Buiten werktijd / Vrij' : 'Unavailable / Off')}
             </span>
           </span>
           {/* Amber: Blocked */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-amber-200 border border-amber-400"></span>
-            <span className="text-amber-800 font-medium">Geblokkeerd / Vakantie</span>
+            <span className="text-amber-800 font-medium">
+              {isNl ? 'Geblokkeerd / Vakantie' : 'Blocked / Vacation'}
+            </span>
           </span>
           {/* Blue: Booked */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-blue-500"></span>
-            <span className="text-blue-800 font-medium">Geboekte sessies</span>
+            <span className="text-blue-800 font-medium">
+              {isNl ? 'Geboekte sessies' : 'Booked Sessions'}
+            </span>
           </span>
         </div>
       </div>
@@ -774,13 +812,13 @@ export const CalendarView: React.FC = () => {
         <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
           {/* Day of week headers */}
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-900 text-center text-xs font-bold text-slate-300 py-3">
-            <div>Mon</div>
-            <div>Tue</div>
-            <div>Wed</div>
-            <div>Thu</div>
-            <div>Fri</div>
-            <div>Sat</div>
-            <div>Sun</div>
+            <div>{isNl ? 'Ma' : 'Mon'}</div>
+            <div>{isNl ? 'Di' : 'Tue'}</div>
+            <div>{isNl ? 'Wo' : 'Wed'}</div>
+            <div>{isNl ? 'Do' : 'Thu'}</div>
+            <div>{isNl ? 'Vr' : 'Fri'}</div>
+            <div>{isNl ? 'Za' : 'Sat'}</div>
+            <div>{isNl ? 'Zo' : 'Sun'}</div>
           </div>
 
           {/* Month day cells */}
@@ -822,14 +860,18 @@ export const CalendarView: React.FC = () => {
                       {/* Clear Availability Tag (Solid, Non-transparent) */}
                       {availInfo.isException ? (
                         <span className="text-[9px] text-amber-900 font-bold bg-amber-200 px-1.5 py-0.5 rounded-md border border-amber-300">
-                          Geblokkeerd
+                          {isNl ? 'Geblokkeerd' : 'Blocked'}
                         </span>
                       ) : availInfo.isAvailable ? (
                         <div className="flex flex-col items-end gap-0.5">
                           <div className="flex items-center gap-1">
                             <span
                               className="text-[9px] font-extrabold text-emerald-950 bg-emerald-200 px-2 py-0.5 rounded-md border border-emerald-400 flex items-center gap-1 shadow-2xs"
-                              title={`Beschikbaar: ${availInfo.description}`}
+                              title={
+                                isNl
+                                  ? `Beschikbaar: ${availInfo.description}`
+                                  : `Available: ${availInfo.description}`
+                              }
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-700"></span>
                               {availInfo.description}
@@ -841,7 +883,11 @@ export const CalendarView: React.FC = () => {
                                 setAdHocBlocksForDate(dateStr, []);
                               }}
                               className="p-0.5 rounded-md bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 transition cursor-pointer shadow-2xs"
-                              title="Alle beschikbare tijden van deze dag wissen (geplande sessies blijven behouden)"
+                              title={
+                                isNl
+                                  ? 'Alle beschikbare tijden van deze dag wissen (geplande sessies blijven behouden)'
+                                  : 'Clear all available times for this day (booked sessions are preserved)'
+                              }
                             >
                               <Trash2 className="h-2.5 w-2.5" />
                             </button>
@@ -849,19 +895,19 @@ export const CalendarView: React.FC = () => {
                           {availInfo.blocks.some((b) => b.breakStart && b.breakEnd) && (
                             <span
                               className="text-[8px] font-bold text-purple-950 bg-purple-200/90 px-1 py-0.2 rounded border border-purple-300 flex items-center gap-0.5 shadow-2xs"
-                              title={`Pauze: ${availInfo.blocks
+                              title={`${isNl ? 'Pauze' : 'Break'}: ${availInfo.blocks
                                 .filter((b) => b.breakStart && b.breakEnd)
                                 .map((b) => `${b.breakStart} - ${b.breakEnd}`)
                                 .join(', ')}`}
                             >
                               <Coffee className="h-2 w-2 text-purple-700 shrink-0" />
-                              <span>Pauze</span>
+                              <span>{isNl ? 'Pauze' : 'Break'}</span>
                             </span>
                           )}
                         </div>
                       ) : (
                         <span className="text-[9px] font-medium text-slate-400 bg-slate-200/60 px-1.5 py-0.5 rounded-md">
-                          Vrij
+                          {isNl ? 'Vrij' : 'Off'}
                         </span>
                       )}
                     </div>
@@ -881,10 +927,10 @@ export const CalendarView: React.FC = () => {
                             className={`w-full text-left truncate rounded-lg px-2 py-0.5 text-[10px] font-medium border transition shadow-2xs ${getStatusBadgeClass(
                               appt.status
                             )}`}
-                            title={`${appt.startTime} - ${client?.name || 'Client'} (${service?.name})`}
+                            title={`${appt.startTime} - ${client?.name || (isNl ? 'Klant' : 'Client')} (${service?.name})`}
                           >
                             <span className="font-bold">{appt.startTime}</span>{' '}
-                            <span>{client?.name || 'Client'}</span>
+                            <span>{client?.name || (isNl ? 'Klant' : 'Client')}</span>
                           </button>
                         );
                       })}
@@ -895,7 +941,7 @@ export const CalendarView: React.FC = () => {
                   {availabilityMode === 'adhoc' && inMonth && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pt-1 flex justify-end">
                       <span className="text-[9px] font-bold text-emerald-700 bg-white/90 border border-emerald-200 px-1.5 py-0.5 rounded-md shadow-2xs">
-                        Uren aanpassen ✏️
+                        {isNl ? 'Uren aanpassen ✏️' : 'Edit hours ✏️'}
                       </span>
                     </div>
                   )}
@@ -913,7 +959,7 @@ export const CalendarView: React.FC = () => {
             {/* Week Header */}
             <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-900 text-center text-xs font-semibold text-slate-300 py-3.5">
               <div className="text-slate-400 font-medium flex items-center justify-center">
-                Tijd
+                {t.timeHeader || (isNl ? 'Tijd' : 'Time')}
               </div>
               {weekDays.map((d, i) => {
                 const dStr = formatDateISO(d);
@@ -931,12 +977,14 @@ export const CalendarView: React.FC = () => {
                     }`}
                     title={
                       availabilityMode === 'adhoc'
-                        ? 'Klik om beschikbaarheid voor deze dag in te stellen'
+                        ? isNl
+                          ? 'Klik om beschikbaarheid voor deze dag in te stellen'
+                          : 'Click to set availability for this day'
                         : ''
                     }
                   >
                     <span className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-                      {d.toLocaleDateString('nl-NL', { weekday: 'short' })}
+                      {d.toLocaleDateString(isNl ? 'nl-NL' : 'en-US', { weekday: 'short' })}
                     </span>
                     <span
                       className={`mt-1 flex h-7 w-7 items-center justify-center rounded-xl text-xs font-bold ${
@@ -950,7 +998,7 @@ export const CalendarView: React.FC = () => {
                     <div className="mt-1">
                       {availInfo.isException ? (
                         <span className="text-[9px] font-bold text-amber-300 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-700">
-                          Geblokkeerd
+                          {isNl ? 'Geblokkeerd' : 'Blocked'}
                         </span>
                       ) : availInfo.isAvailable ? (
                         <div className="flex flex-col items-center gap-1">
@@ -961,7 +1009,7 @@ export const CalendarView: React.FC = () => {
                           {availInfo.blocks.some((b) => b.breakStart && b.breakEnd) && (
                             <span
                               className="text-[8px] font-bold text-purple-200 bg-purple-950/80 px-1.5 py-0.2 rounded border border-purple-700/80 flex items-center gap-0.5 shadow-2xs"
-                              title={`Pauze: ${availInfo.blocks
+                              title={`${isNl ? 'Pauze' : 'Break'}: ${availInfo.blocks
                                 .filter((b) => b.breakStart && b.breakEnd)
                                 .map((b) => `${b.breakStart} - ${b.breakEnd}`)
                                 .join(', ')}`}
@@ -980,15 +1028,19 @@ export const CalendarView: React.FC = () => {
                               setAdHocBlocksForDate(dStr, []);
                             }}
                             className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-rose-500/20 hover:bg-rose-600 border border-rose-400/40 hover:border-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-rose-200 hover:text-white transition cursor-pointer shadow-2xs"
-                            title="Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)"
+                            title={
+                              isNl
+                                ? 'Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)'
+                                : 'Clear all available times for this day in 1 click (booked sessions are preserved)'
+                            }
                           >
                             <Trash2 className="h-2.5 w-2.5 shrink-0" />
-                            <span>Wis tijden</span>
+                            <span>{isNl ? 'Wis tijden' : 'Clear hours'}</span>
                           </button>
                         </div>
                       ) : (
                         <span className="text-[9px] font-medium text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
-                          Vrij
+                          {isNl ? 'Vrij' : 'Off'}
                         </span>
                       )}
                     </div>
@@ -1047,7 +1099,11 @@ export const CalendarView: React.FC = () => {
                             handleCellClick(dStr, `${h}:${clickedMinute}`);
                           }}
                           className="absolute inset-x-0 border-b border-slate-100/90 hover:bg-emerald-50/20 transition cursor-pointer"
-                          title={`Klik om beschikbaarheid in te voeren om ${hour}`}
+                          title={
+                            isNl
+                              ? `Klik om beschikbaarheid in te voeren om ${hour}`
+                              : `Click to set availability at ${hour}`
+                          }
                         >
                           {/* 30-minute subtle dashed guideline */}
                           <div className="absolute top-[30px] inset-x-0 border-b border-dashed border-slate-100/70 pointer-events-none" />
@@ -1064,16 +1120,20 @@ export const CalendarView: React.FC = () => {
                             if (exc) setSelectedException(exc);
                           }}
                           className="absolute inset-x-1 top-1 bottom-1 rounded-2xl bg-amber-100/90 border-2 border-amber-400 p-2.5 shadow-xs cursor-pointer z-20 flex flex-col items-center justify-center text-center group/vacation transition hover:bg-amber-200/90"
-                          title="Geblokkeerd wegens vakantie / verlof. Klik om te beheren."
+                          title={
+                            isNl
+                              ? 'Geblokkeerd wegens vakantie / verlof. Klik om te beheren.'
+                              : 'Blocked due to vacation / time off. Click to manage.'
+                          }
                         >
                           <Palmtree className="h-6 w-6 text-amber-600 mb-1" />
                           <span className="text-xs font-black text-amber-950 block truncate max-w-full">
                             {(settings.exceptions || []).find(
                               (ex) => dStr >= ex.startDate && dStr <= ex.endDate
-                            )?.title || 'Vakantie'}
+                            )?.title || (isNl ? 'Vakantie' : 'Vacation')}
                           </span>
                           <span className="text-[10px] text-amber-800 font-bold mt-0.5">
-                            Geblokkeerd
+                            {isNl ? 'Geblokkeerd' : 'Blocked'}
                           </span>
                         </div>
                       )}
@@ -1108,7 +1168,11 @@ export const CalendarView: React.FC = () => {
                               }}
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-1 rounded-xl bg-emerald-100/95 border-2 border-emerald-500 text-emerald-950 p-1.5 shadow-2xs hover:bg-emerald-200 hover:border-emerald-600 cursor-pointer z-10 transition flex flex-col justify-between overflow-hidden group/slot"
-                              title={`Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Klik om aan te passen.`}
+                              title={
+                                isNl
+                                  ? `Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Klik om aan te passen.`
+                                  : `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Click to edit.`
+                              }
                             >
                               <div className="flex items-center justify-between gap-1 leading-tight">
                                 <span className="text-[10px] font-black text-emerald-950 flex items-center gap-1 truncate">
@@ -1121,9 +1185,11 @@ export const CalendarView: React.FC = () => {
                               </div>
                               {heightPx >= 36 && (
                                 <div className="flex items-center justify-between text-[9px] text-emerald-900 font-semibold truncate mt-0.5">
-                                  <span className="truncate">Beschikbaar</span>
+                                  <span className="truncate">
+                                    {isNl ? 'Beschikbaar' : 'Available'}
+                                  </span>
                                   <span className="opacity-0 group-hover/slot:opacity-100 text-emerald-700 font-bold underline transition">
-                                    Wijzig
+                                    {isNl ? 'Wijzig' : 'Edit'}
                                   </span>
                                 </div>
                               )}
@@ -1144,9 +1210,17 @@ export const CalendarView: React.FC = () => {
                               key={`buf-${bIdx}-${buf.startMin}`}
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-md bg-slate-100/90 border-y border-dashed border-slate-300/80 text-[8px] font-bold text-slate-500 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
-                              title={`Tussenruimte / rusttijd: ${buf.duration} min`}
+                              title={
+                                isNl
+                                  ? `Tussenruimte / rusttijd: ${buf.duration} min`
+                                  : `Buffer / rest time: ${buf.duration} min`
+                              }
                             >
-                              {heightPx >= 12 && <span>+{buf.duration}m rust</span>}
+                              {heightPx >= 12 && (
+                                <span>
+                                  +{buf.duration}m {isNl ? 'rust' : 'buffer'}
+                                </span>
+                              )}
                             </div>
                           );
                         })}
@@ -1181,12 +1255,16 @@ export const CalendarView: React.FC = () => {
                               }}
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-1 rounded-xl bg-purple-200/95 border-2 border-purple-500 text-purple-950 hover:bg-purple-300 hover:border-purple-600 p-1.5 shadow-xs cursor-pointer z-15 transition flex flex-col justify-center overflow-hidden group/break"
-                              title={`Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`}
+                              title={
+                                isNl
+                                  ? `Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`
+                                  : `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
+                              }
                             >
                               <div className="flex items-center justify-between gap-1 leading-tight">
                                 <span className="text-[10px] font-black text-purple-950 flex items-center gap-1 truncate">
                                   <Coffee className="h-3 w-3 text-purple-700 shrink-0" />
-                                  Pauze {brk.startTimeStr} - {brk.endTimeStr}
+                                  {isNl ? 'Pauze' : 'Break'} {brk.startTimeStr} - {brk.endTimeStr}
                                 </span>
                                 <span className="text-[9px] font-extrabold text-purple-900 bg-white/80 border border-purple-300 px-1 py-0.2 rounded shrink-0">
                                   {brk.duration}m
@@ -1194,9 +1272,11 @@ export const CalendarView: React.FC = () => {
                               </div>
                               {heightPx >= 38 && (
                                 <div className="flex items-center justify-between text-[9px] text-purple-900 font-bold truncate mt-0.5">
-                                  <span>Rusttijd / Geen boekingen</span>
+                                  <span>
+                                    {isNl ? 'Rusttijd / Geen boekingen' : 'Break / No bookings'}
+                                  </span>
                                   <span className="opacity-0 group-hover/break:opacity-100 underline text-purple-800 transition">
-                                    Wijzig
+                                    {isNl ? 'Wijzig' : 'Edit'}
                                   </span>
                                 </div>
                               )}
@@ -1232,7 +1312,7 @@ export const CalendarView: React.FC = () => {
                               <span>{appt.packageId ? 'Credit' : formatPrice(appt.price)}</span>
                             </div>
                             <div className="font-bold text-[11px] truncate">
-                              {client?.name || 'Klant'}
+                              {client?.name || (isNl ? 'Klant' : 'Client')}
                             </div>
                             {heightPx >= 48 && (
                               <div className="text-[9px] opacity-80 truncate">
@@ -1276,7 +1356,7 @@ export const CalendarView: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-5 gap-4">
             <div>
               <span className="text-xs text-emerald-600 font-bold uppercase tracking-wider">
-                Dagoverzicht & Agenda
+                {isNl ? 'Dagoverzicht & Agenda' : 'Daily Overview & Schedule'}
               </span>
               <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                 {formatFullHumanDate(currentDateStr)}
@@ -1308,10 +1388,16 @@ export const CalendarView: React.FC = () => {
                     ></span>
                     <span>
                       {dayInfo.isException
-                        ? 'Vakantie / Geblokkeerd'
+                        ? isNl
+                          ? 'Vakantie / Geblokkeerd'
+                          : 'Vacation / Blocked'
                         : dayInfo.isAvailable
-                        ? `Beschikbaar: ${dayInfo.description} (${dayInfo.totalHours} u)`
-                        : 'Geen beschikbaarheid (Vrij)'}
+                        ? isNl
+                          ? `Beschikbaar: ${dayInfo.description} (${dayInfo.totalHours} u)`
+                          : `Available: ${dayInfo.description} (${dayInfo.totalHours} h)`
+                        : isNl
+                        ? 'Geen beschikbaarheid (Vrij)'
+                        : 'No availability (Off)'}
                     </span>
                   </div>
 
@@ -1319,7 +1405,7 @@ export const CalendarView: React.FC = () => {
                     <div className="px-3 py-1.5 rounded-2xl border text-xs font-bold flex items-center gap-1.5 bg-purple-100 text-purple-900 border-purple-300 shadow-2xs">
                       <Coffee className="h-3.5 w-3.5 text-purple-700" />
                       <span>
-                        Pauze:{' '}
+                        {isNl ? 'Pauze:' : 'Break:'}{' '}
                         {dayInfo.blocks
                           .filter((b) => b.breakStart && b.breakEnd)
                           .map((b) => `${b.breakStart} - ${b.breakEnd}`)
@@ -1333,10 +1419,14 @@ export const CalendarView: React.FC = () => {
                       type="button"
                       onClick={() => setAdHocBlocksForDate(currentDateStr, [])}
                       className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                      title="Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)"
+                      title={
+                        isNl
+                          ? 'Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)'
+                          : 'Clear all available times for this day in 1 click (booked sessions are preserved)'
+                      }
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>Wis Tijden</span>
+                      <span>{isNl ? 'Wis Tijden' : 'Clear Hours'}</span>
                     </button>
                   )}
 
@@ -1345,7 +1435,7 @@ export const CalendarView: React.FC = () => {
                     className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs flex items-center gap-1.5"
                   >
                     <Sliders className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Uren Aanpassen</span>
+                    <span>{isNl ? 'Uren Aanpassen' : 'Edit Hours'}</span>
                   </button>
                 </div>
               );
@@ -1355,12 +1445,12 @@ export const CalendarView: React.FC = () => {
           {/* Appointments on this day */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Afspraken op deze dag ({appointments.filter((a) => a.date === currentDateStr).length})
+              {isNl ? 'Afspraken op deze dag' : 'Appointments on this day'} ({appointments.filter((a) => a.date === currentDateStr).length})
             </h4>
 
             {appointments.filter((a) => a.date === currentDateStr).length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
-                Geen afspraken gepland voor deze dag.
+                {isNl ? 'Geen afspraken gepland voor deze dag.' : 'No appointments scheduled for this day.'}
               </div>
             ) : (
               appointments
@@ -1433,14 +1523,18 @@ export const CalendarView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Uurschema & Werktijden (Exact op de minuut gepositioneerd)
+                  {isNl
+                    ? 'Uurschema & Werktijden (Exact op de minuut gepositioneerd)'
+                    : 'Hourly Schedule & Working Hours (Minute-Accurate Positioning)'}
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  Tijdsblokken en pauzes zijn exact gepositioneerd volgens je ingestelde blokduur en tussenruimte.
+                  {isNl
+                    ? 'Tijdsblokken en pauzes zijn exact gepositioneerd volgens je ingestelde blokduur en tussenruimte.'
+                    : 'Time slots and breaks are positioned accurately based on your configured slot duration and buffer time.'}
                 </p>
               </div>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                Direct aanraken & wijzigen
+                {isNl ? 'Direct aanraken & wijzigen' : 'Click or tap to edit'}
               </span>
             </div>
 
@@ -1481,7 +1575,11 @@ export const CalendarView: React.FC = () => {
                         handleCellClick(currentDateStr, `${h}:${clickedMinute}`);
                       }}
                       className="absolute inset-x-0 border-b border-slate-100/90 hover:bg-emerald-50/20 transition cursor-pointer"
-                      title={`Klik om beschikbaarheid in te voeren om ${hour}`}
+                      title={
+                        isNl
+                          ? `Klik om beschikbaarheid in te voeren om ${hour}`
+                          : `Click to set availability at ${hour}`
+                      }
                     >
                       <div className="absolute top-[30px] inset-x-0 border-b border-dashed border-slate-100/70 pointer-events-none" />
                     </div>
@@ -1506,10 +1604,12 @@ export const CalendarView: React.FC = () => {
                         >
                           <Palmtree className="h-8 w-8 text-amber-600 mb-2" />
                           <h4 className="text-base font-black text-amber-950">
-                            {exc?.title || 'Vakantie / Geblokkeerd'}
+                            {exc?.title || (isNl ? 'Vakantie / Geblokkeerd' : 'Vacation / Blocked')}
                           </h4>
                           <p className="text-xs text-amber-800 font-semibold mt-1">
-                            Geen afspraken mogelijk op deze dag. Klik om te beheren.
+                            {isNl
+                              ? 'Geen afspraken mogelijk op deze dag. Klik om te beheren.'
+                              : 'No appointments possible on this day. Click to manage.'}
                           </p>
                         </div>
                       );
@@ -1546,7 +1646,11 @@ export const CalendarView: React.FC = () => {
                               }}
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-xl bg-emerald-100/95 border-2 border-emerald-500 text-emerald-950 p-2 shadow-2xs hover:bg-emerald-200 hover:border-emerald-600 cursor-pointer z-10 transition flex items-center justify-between overflow-hidden group/slot"
-                              title={`Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Klik om aan te passen.`}
+                              title={
+                                isNl
+                                  ? `Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Klik om aan te passen.`
+                                  : `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Click to edit.`
+                              }
                             >
                               <div className="flex items-center gap-2">
                                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-700 shrink-0" />
@@ -1554,7 +1658,7 @@ export const CalendarView: React.FC = () => {
                                   {slot.startTimeStr} - {slot.endTimeStr}
                                 </span>
                                 <span className="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-300 px-1.5 py-0.5 rounded">
-                                  {slot.duration} min tijdsblok
+                                  {slot.duration} min {isNl ? 'tijdsblok' : 'time slot'}
                                 </span>
                                 {slot.block.notes && (
                                   <span className="text-[11px] text-emerald-900 font-medium italic truncate max-w-xs">
@@ -1564,7 +1668,7 @@ export const CalendarView: React.FC = () => {
                               </div>
                               <span className="text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs flex items-center gap-1 group-hover/slot:bg-emerald-700 group-hover/slot:text-white transition">
                                 <Pencil className="h-3 w-3" />
-                                <span>Aanpassen</span>
+                                <span>{isNl ? 'Aanpassen' : 'Edit'}</span>
                               </span>
                             </div>
                           );
@@ -1583,7 +1687,7 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-4 rounded-md bg-slate-100/90 border-y border-dashed border-slate-300/80 text-[9px] font-bold text-slate-500 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
                             >
-                              +{buf.duration} min tussenruimte / buffer
+                              +{buf.duration} min {isNl ? 'tussenruimte / buffer' : 'buffer / rest time'}
                             </div>
                           );
                         })}
@@ -1617,20 +1721,24 @@ export const CalendarView: React.FC = () => {
                               }}
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-xl bg-purple-200/95 border-2 border-purple-500 text-purple-950 hover:bg-purple-300 hover:border-purple-600 p-2 shadow-xs cursor-pointer z-15 transition flex items-center justify-between overflow-hidden group/break"
-                              title={`Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`}
+                              title={
+                                isNl
+                                  ? `Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`
+                                  : `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
+                              }
                             >
                               <div className="flex items-center gap-2">
                                 <Coffee className="h-4 w-4 text-purple-700 shrink-0" />
                                 <span className="text-xs font-black text-purple-950">
-                                  Pauze: {brk.startTimeStr} - {brk.endTimeStr}
+                                  {isNl ? 'Pauze:' : 'Break:'} {brk.startTimeStr} - {brk.endTimeStr}
                                 </span>
                                 <span className="text-[10px] font-extrabold text-purple-900 bg-white border border-purple-300 px-1.5 py-0.5 rounded">
-                                  {brk.duration} min rust
+                                  {brk.duration} min {isNl ? 'rust' : 'break'}
                                 </span>
                               </div>
                               <span className="text-[10px] font-bold text-purple-900 bg-white/90 border border-purple-300 px-2 py-0.5 rounded-md shadow-2xs flex items-center gap-1 group-hover/break:bg-purple-800 group-hover/break:text-white transition">
                                 <Pencil className="h-3 w-3" />
-                                <span>Pauze Wijzigen</span>
+                                <span>{isNl ? 'Pauze Wijzigen' : 'Edit Break'}</span>
                               </span>
                             </div>
                           );
@@ -1664,7 +1772,7 @@ export const CalendarView: React.FC = () => {
                                   {appt.startTime} - {appt.endTime}
                                 </div>
                                 <div className="font-bold text-sm">
-                                  {client?.name || 'Klant'}
+                                  {client?.name || (isNl ? 'Klant' : 'Client')}
                                 </div>
                                 <div className="text-[11px] opacity-85">
                                   ({service?.name})
@@ -1693,7 +1801,7 @@ export const CalendarView: React.FC = () => {
                         >
                           <div className="h-2.5 w-2.5 rounded-full bg-rose-500 -ml-1.5" />
                           <span className="ml-2 text-[9px] font-bold text-white bg-rose-500 px-1.5 py-0.2 rounded shadow-2xs">
-                            Nu
+                            {isNl ? 'Nu' : 'Now'}
                           </span>
                         </div>
                       );
@@ -1784,18 +1892,22 @@ export const CalendarView: React.FC = () => {
                   {isEditingAppointment ? (
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-emerald-950">Afspraak Bewerken</span>
+                        <span className="font-bold text-emerald-950">
+                          {isNl ? 'Afspraak Bewerken' : 'Edit Appointment'}
+                        </span>
                         <button
                           type="button"
                           onClick={() => setIsEditingAppointment(false)}
                           className="text-slate-400 hover:text-slate-600 font-semibold"
                         >
-                          Sluiten
+                          {isNl ? 'Sluiten' : 'Close'}
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block font-bold text-slate-700 mb-1">Datum</label>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            {isNl ? 'Datum' : 'Date'}
+                          </label>
                           <input
                             type="date"
                             value={editApptForm.date}
@@ -1804,7 +1916,9 @@ export const CalendarView: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block font-bold text-slate-700 mb-1">Starttijd</label>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            {isNl ? 'Starttijd' : 'Start Time'}
+                          </label>
                           <input
                             type="time"
                             value={editApptForm.startTime}
@@ -1815,7 +1929,9 @@ export const CalendarView: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block font-bold text-slate-700 mb-1">Dienst</label>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            {isNl ? 'Dienst' : 'Service'}
+                          </label>
                           <select
                             value={editApptForm.serviceId}
                             onChange={(e) => setEditApptForm({ ...editApptForm, serviceId: e.target.value })}
@@ -1829,7 +1945,9 @@ export const CalendarView: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="block font-bold text-slate-700 mb-1">Prijs</label>
+                          <label className="block font-bold text-slate-700 mb-1">
+                            {isNl ? 'Prijs' : 'Price'}
+                          </label>
                           <input
                             type="number"
                             step="0.5"
@@ -1845,7 +1963,7 @@ export const CalendarView: React.FC = () => {
                           onClick={handleSaveAppointmentEdit}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-xs"
                         >
-                          Wijzigingen Opslaan
+                          {isNl ? 'Wijzigingen Opslaan' : 'Save Changes'}
                         </button>
                       </div>
                     </div>
@@ -1916,7 +2034,7 @@ export const CalendarView: React.FC = () => {
                         className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        <span>Bewerken</span>
+                        <span>{isNl ? 'Bewerken' : 'Edit'}</span>
                       </button>
                     </div>
 
@@ -1925,16 +2043,20 @@ export const CalendarView: React.FC = () => {
                         onClick={() => setIsCancelConfirmOpen(true)}
                         className="text-xs font-semibold text-slate-500 hover:text-amber-600 transition"
                       >
-                        Cancel Booking
+                        {isNl ? 'Afspraak Annuleren' : 'Cancel Booking'}
                       </button>
                       <button
                         type="button"
                         onClick={handleDeleteAppointment}
                         className="flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 transition"
-                        title="Afspraak definitief verwijderen uit kalender en database"
+                        title={
+                          isNl
+                            ? 'Afspraak definitief verwijderen uit kalender en database'
+                            : 'Permanently delete appointment from calendar and database'
+                        }
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        <span>Verwijderen</span>
+                        <span>{isNl ? 'Verwijderen' : 'Delete'}</span>
                       </button>
                     </div>
                   </div>
@@ -2037,20 +2159,22 @@ export const CalendarView: React.FC = () => {
             <div className="space-y-3 text-xs">
               <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 text-amber-950 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-medium">Periode:</span>
+                  <span className="text-slate-500 font-medium">{isNl ? 'Periode:' : 'Period:'}</span>
                   <span className="font-bold text-slate-900">
-                    {formatHumanDate(selectedException.startDate)} t/m {formatHumanDate(selectedException.endDate)}
+                    {formatHumanDate(selectedException.startDate)} {isNl ? 't/m' : 'to'} {formatHumanDate(selectedException.endDate)}
                   </span>
                 </div>
                 {selectedException.notes && (
                   <div className="flex items-start justify-between gap-2 pt-1.5 border-t border-amber-200/60">
-                    <span className="text-slate-500 font-medium shrink-0">Notitie:</span>
+                    <span className="text-slate-500 font-medium shrink-0">{isNl ? 'Notitie:' : 'Notes:'}</span>
                     <span className="font-semibold text-right text-slate-800">{selectedException.notes}</span>
                   </div>
                 )}
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Tijdens deze vakantieperiode is de agenda geblokkeerd en kunnen klanten geen tijdstippen reserveren.
+                {isNl
+                  ? 'Tijdens deze vakantieperiode is de agenda geblokkeerd en kunnen klanten geen tijdstippen reserveren.'
+                  : 'During this vacation period, the calendar is blocked and clients cannot book appointments.'}
               </p>
             </div>
 
@@ -2064,14 +2188,14 @@ export const CalendarView: React.FC = () => {
                 className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition flex items-center gap-1.5 shadow-2xs"
               >
                 <Trash2 className="h-4 w-4" />
-                <span>Vakantie Verwijderen</span>
+                <span>{isNl ? 'Vakantie Verwijderen' : 'Delete Vacation'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedException(null)}
                 className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs"
               >
-                Sluiten
+                {isNl ? 'Sluiten' : 'Close'}
               </button>
             </div>
           </div>

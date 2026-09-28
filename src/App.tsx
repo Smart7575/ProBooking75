@@ -47,7 +47,9 @@ const MainLayout: React.FC = () => {
             )}
             {currentTab === 'chat' && <ProviderChatView onNavigateToTab={setCurrentTab} />}
             {currentTab === 'packages' && <PackageManagement />}
-            {currentTab === 'availability' && <AvailabilitySettings onNavigate={setCurrentTab} />}
+            {(currentTab === 'availability' || currentTab === 'settings') && (
+              <AvailabilitySettings onNavigate={setCurrentTab} />
+            )}
             {currentTab === 'reports' && <ReportingView />}
           </div>
         ) : (

@@ -89,6 +89,7 @@ export interface ServicePackage {
   description: string;
   serviceId?: string; // Optional specific service ID, or undefined/'all' for any service
   sessionCount: number; // e.g. 5, 10, 20 sessions
+  sessionDurationMinutes?: number; // Standard duration of 1 session in this package (e.g. 60 min)
   price: number; // Total package price in EUR
   originalValue?: number; // Calculated base value to highlight discount
   validityDays?: number; // e.g. 90, 180 days (or undefined for never expires)
@@ -127,6 +128,7 @@ export interface ClientPackage {
   serviceId?: string;
   totalSessions: number;
   remainingSessions: number;
+  sessionDurationMinutes?: number; // Standard duration of 1 session in minutes (e.g. 60)
   purchasedAt: string; // ISO date
   expiresAt?: string; // ISO date
   pricePaid: number;
@@ -153,6 +155,7 @@ export interface Appointment {
   cancellationReason?: string;
   packageId?: string; // ID of the ClientPackage if booked using a package
   packageName?: string; // Name of the package applied
+  packageSessionsDeducted?: number; // Number of session credits deducted (e.g. 0.5, 1, 1.5)
   billingStatus?: BillingStatus;
   invoicedAt?: string;
   paidAt?: string;

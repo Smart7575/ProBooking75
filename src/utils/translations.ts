@@ -46,6 +46,7 @@ export const translations = {
     tabReports: 'Reports',
     tabBilling: 'Invoicing',
     tabManage: 'Manage',
+    tabSettings: 'Settings',
 
     // Statuses
     statusReserved: 'Reserved',
@@ -459,6 +460,7 @@ export const translations = {
     tabReports: 'Rapporten',
     tabBilling: 'Facturatie',
     tabManage: 'Beheer',
+    tabSettings: 'Instellingen',
 
     // Statuses
     statusReserved: 'Gereserveerd',

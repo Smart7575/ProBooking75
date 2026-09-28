@@ -17,7 +17,11 @@ import {
   FileText,
   MessageSquare,
   Receipt,
+  LogOut,
+  Trash2,
 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../firebase';
 import { formatFullHumanDate, isUpcomingBirthday, getTodayISO } from '../../utils/dateUtils';
 import { Appointment } from '../../types';
 
@@ -33,11 +37,13 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
     updateAppointmentStatus,
     formatPrice,
     t,
+    language,
     setRole,
     setActiveClientId,
     getUnreadCountForProvider,
     unbilledItemsCount,
     totalUnbilledAmount,
+    clearDemoData,
   } = useBooking();
 
   const providerUnread = getUnreadCountForProvider();
@@ -47,6 +53,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
   // Selected appointment for completion note modal
   const [completingAppt, setCompletingAppt] = useState<Appointment | null>(null);
   const [completionNotes, setCompletionNotes] = useState('');
+  const [showClearDemoModal, setShowClearDemoModal] = useState(false);
+  const [isClearingDemo, setIsClearingDemo] = useState(false);
 
   // Calculate KPIs
   const deliveredAppts = appointments.filter((a) => a.status === 'delivered');
@@ -111,11 +119,36 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Welcome back, {settings.name}
+            {language === 'nl' ? `Welkom terug, ${settings.name}` : `Welcome back, ${settings.name}`}
           </h1>
           <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
-            You have {todayAppointments.length} sessions scheduled for today and {reservedAppts.length} active reservations on your calendar.
+            {language === 'nl'
+              ? `Je hebt vandaag ${todayAppointments.length} sessies gepland en ${reservedAppts.length} actieve reserveringen in je agenda.`
+              : `You have ${todayAppointments.length} sessions scheduled for today and ${reservedAppts.length} active reservations on your calendar.`}
           </p>
+        </div>
+
+        <div className="relative z-10 flex flex-wrap items-center gap-2.5 self-start md:self-center shrink-0">
+          {(clients.length > 0 || appointments.length > 0) && (
+            <button
+              type="button"
+              onClick={() => setShowClearDemoModal(true)}
+              className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 hover:border-emerald-500/40 px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-200 hover:text-white shadow-lg transition cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>
+                {language === 'nl' ? 'Demodata Wissen' : 'Clear Demo Data'}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => signOut(auth)}
+            className="flex items-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-600 hover:border-rose-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-200 hover:text-white shadow-lg shadow-rose-950/30 transition cursor-pointer"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>{language === 'nl' ? 'Uitloggen' : 'Sign Out'}</span>
+          </button>
         </div>
       </div>
 
@@ -529,6 +562,83 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
                   {t.saveNotes}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Demo Data Confirmation Modal */}
+      {showClearDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {language === 'nl'
+                      ? 'Demodata Wissen & Schone App?'
+                      : 'Clear Demo Data & Start Clean?'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {language === 'nl'
+                      ? 'Je eigen trainerprofiel blijft behouden'
+                      : 'Your trainer profile will be preserved'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={() => setShowClearDemoModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed mb-5">
+              {language === 'nl'
+                ? 'Alle voorbeeldcliënten, afspraken, pakketten, berichten, facturen en werktijden worden gewist zodat je met een volledig schone app kunt beginnen.'
+                : 'All sample clients, appointments, packages, messages, invoices, and working hours will be cleared so you can start with a completely clean app.'}
+            </p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={() => setShowClearDemoModal(false)}
+                className="rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={isClearingDemo}
+                onClick={async () => {
+                  setIsClearingDemo(true);
+                  try {
+                    await clearDemoData();
+                    setShowClearDemoModal(false);
+                  } finally {
+                    setIsClearingDemo(false);
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>
+                  {isClearingDemo
+                    ? language === 'nl'
+                      ? 'Bezig met wissen...'
+                      : 'Clearing...'
+                    : language === 'nl'
+                    ? 'Ja, Wis Demodata & Start Schoon'
+                    : 'Yes, Clear Demo Data & Start Clean'}
+                </span>
+              </button>
             </div>
           </div>
         </div>

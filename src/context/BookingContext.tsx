@@ -107,7 +107,9 @@ interface BookingContextType {
   
   clientPackages: ClientPackage[];
   purchasePackage: (clientId: string, packageId: string) => { success: boolean; clientPackage?: ClientPackage; message?: string };
-  getClientActivePackages: (clientId: string, serviceId?: string) => ClientPackage[];
+  getClientActivePackages: (clientId: string, serviceId?: string, durationMinutes?: number) => ClientPackage[];
+  getPackageStandardDuration: (cp?: ClientPackage, pkg?: ServicePackage) => number;
+  calculatePackageCreditsForDuration: (durationMinutes: number, cp?: ClientPackage, pkg?: ServicePackage) => number;
   adjustClientPackageBalance: (clientPackageId: string, change: number, reason?: string) => void;
   grantClientPackage: (clientId: string, packageId: string, customSessions?: number) => ClientPackage;
   updateClientPackage: (clientPackageId: string, updates: Partial<ClientPackage>) => void;
@@ -248,6 +250,7 @@ interface BookingContextType {
 
   // Helpers
   resetDemoData: () => void;
+  clearDemoData: () => Promise<void>;
   currentClient: Client | undefined;
 
   // Magic Link testing & simulation
@@ -1090,9 +1093,44 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   // Package & Bundle Management
+  const getPackageStandardDuration = useCallback(
+    (cp?: ClientPackage, pkg?: ServicePackage): number => {
+      if (cp?.sessionDurationMinutes && cp.sessionDurationMinutes > 0) {
+        return cp.sessionDurationMinutes;
+      }
+      if (pkg?.sessionDurationMinutes && pkg.sessionDurationMinutes > 0) {
+        return pkg.sessionDurationMinutes;
+      }
+      const matchedPkg = cp ? packages.find((p) => p.id === cp.packageId) : undefined;
+      if (matchedPkg?.sessionDurationMinutes && matchedPkg.sessionDurationMinutes > 0) {
+        return matchedPkg.sessionDurationMinutes;
+      }
+      const srvId = cp?.serviceId || pkg?.serviceId || matchedPkg?.serviceId;
+      if (srvId) {
+        const linkedSrv = settings.services.find((s) => s.id === srvId);
+        if (linkedSrv && linkedSrv.durationMinutes > 0) {
+          return linkedSrv.durationMinutes;
+        }
+      }
+      return settings.standardSlotDuration || 60;
+    },
+    [packages, settings.services, settings.standardSlotDuration]
+  );
+
+  const calculatePackageCreditsForDuration = useCallback(
+    (durationMinutes: number, cp?: ClientPackage, pkg?: ServicePackage): number => {
+      const stdDuration = getPackageStandardDuration(cp, pkg);
+      if (!stdDuration || stdDuration <= 0) return 1;
+      const effDuration = durationMinutes > 0 ? durationMinutes : stdDuration;
+      return Math.round((effDuration / stdDuration) * 100) / 100;
+    },
+    [getPackageStandardDuration]
+  );
+
   const addPackage = (pkgData: Omit<ServicePackage, 'id'>) => {
     const newPkg: ServicePackage = {
       ...pkgData,
+      sessionDurationMinutes: pkgData.sessionDurationMinutes || 60,
       id: `pkg-${Date.now()}`,
     };
     setPackages((prev) => [newPkg, ...prev]);
@@ -1102,6 +1140,19 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setPackages((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...pkgData } : p))
     );
+    if (pkgData.sessionDurationMinutes && pkgData.sessionDurationMinutes > 0) {
+      setClientPackages((prev) =>
+        prev.map((cp) =>
+          cp.packageId === id
+            ? {
+                ...cp,
+                sessionDurationMinutes: pkgData.sessionDurationMinutes,
+                packageName: pkgData.name || cp.packageName,
+              }
+            : cp
+        )
+      );
+    }
   };
 
   const deletePackage = (id: string) => {
@@ -1119,6 +1170,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const todayStr = formatDateISO(new Date());
     const expiresAt = pkg.validityDays ? addDaysToISO(todayStr, pkg.validityDays) : undefined;
+    const stdDuration = getPackageStandardDuration(undefined, pkg);
 
     const newClientPackage: ClientPackage = {
       id: `cpkg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1128,6 +1180,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       serviceId: pkg.serviceId,
       totalSessions: pkg.sessionCount,
       remainingSessions: pkg.sessionCount,
+      sessionDurationMinutes: stdDuration,
       purchasedAt: todayStr,
       expiresAt,
       pricePaid: pkg.price,
@@ -1149,14 +1202,17 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       id: 'pkg-custom',
       name: 'Complimentary / Custom Bundle',
       sessionCount: customSessions || 5,
+      sessionDurationMinutes: settings.standardSlotDuration || 60,
       price: 0,
       serviceId: undefined,
       validityDays: 180,
+      isActive: true,
+      description: '',
     };
-    const client = clients.find((c) => c.id === clientId);
     const todayStr = formatDateISO(new Date());
     const count = customSessions || pkg.sessionCount;
     const expiresAt = pkg.validityDays ? addDaysToISO(todayStr, pkg.validityDays) : undefined;
+    const stdDuration = getPackageStandardDuration(undefined, pkg as ServicePackage);
 
     const newClientPackage: ClientPackage = {
       id: `cpkg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1166,6 +1222,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       serviceId: pkg.serviceId,
       totalSessions: count,
       remainingSessions: count,
+      sessionDurationMinutes: stdDuration,
       purchasedAt: todayStr,
       expiresAt,
       pricePaid: 0,
@@ -1178,13 +1235,25 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     return newClientPackage;
   };
 
-  const getClientActivePackages = (clientId: string, serviceId?: string): ClientPackage[] => {
+  const getClientActivePackages = (
+    clientId: string,
+    serviceId?: string,
+    durationMinutes?: number
+  ): ClientPackage[] => {
     const todayStr = formatDateISO(new Date());
+    const targetService = serviceId
+      ? settings.services.find((s) => s.id === serviceId)
+      : undefined;
+    const effectiveDuration = durationMinutes ?? targetService?.durationMinutes;
+
     return clientPackages.filter((cp) => {
       if (cp.clientId !== clientId) return false;
       if (cp.remainingSessions <= 0) return false;
       if (cp.expiresAt && cp.expiresAt < todayStr) return false;
-      if (serviceId && cp.serviceId && cp.serviceId !== serviceId) return false;
+      if (effectiveDuration && effectiveDuration > 0) {
+        const neededCredits = calculatePackageCreditsForDuration(effectiveDuration, cp);
+        if (cp.remainingSessions + 0.0001 < neededCredits) return false;
+      }
       return true;
     });
   };
@@ -1193,7 +1262,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setClientPackages((prev) =>
       prev.map((cp) => {
         if (cp.id === clientPackageId) {
-          const newRemaining = Math.max(0, cp.remainingSessions + change);
+          const newRemaining = Math.max(
+            0,
+            Math.round((cp.remainingSessions + change) * 100) / 100
+          );
           return {
             ...cp,
             remainingSessions: newRemaining,
@@ -1416,7 +1488,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             breakEnd: daySched.breakEnd,
             slotDuration: daySched.slotDuration,
             bufferMinutes: daySched.bufferMinutes,
-            notes: 'Vast weekrooster',
+            notes: language === 'nl' ? 'Vast weekrooster' : 'Fixed weekly schedule',
           },
           isSyntheticWeekly: true,
         };
@@ -1492,7 +1564,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
                 breakEnd: daySched.breakEnd,
                 slotDuration: daySched.slotDuration,
                 bufferMinutes: daySched.bufferMinutes,
-                notes: 'Vast weekrooster',
+                notes: language === 'nl' ? 'Vast weekrooster' : 'Fixed weekly schedule',
               },
             ];
           }
@@ -1608,7 +1680,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           breakEnd: dayConfig.breakEnd || undefined,
           slotDuration: dayConfig.slotDuration,
           bufferMinutes: dayConfig.bufferMinutes,
-          notes: `Vast weekrooster (${startDate} t/m ${endDate})`,
+          notes:
+            language === 'nl'
+              ? `Vast weekrooster (${startDate} t/m ${endDate})`
+              : `Fixed weekly schedule (${startDate} to ${endDate})`,
         });
         appliedCount++;
       }
@@ -1635,7 +1710,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         mode: settings.availabilityMode || 'weekly',
         blocks: [],
         totalHours: 0,
-        description: 'Vakantie / Geblokkeerd',
+        description: language === 'nl' ? 'Vakantie / Geblokkeerd' : 'Vacation / Blocked',
       };
     }
 
@@ -1676,7 +1751,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         mode: 'adhoc' as AvailabilityMode,
         blocks: [],
         totalHours: 0,
-        description: 'Niet ingepland',
+        description: language === 'nl' ? 'Niet ingepland' : 'Not scheduled',
       };
     } else {
       const dateObj = parseDateISO(dateStr);
@@ -1689,7 +1764,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           mode: 'weekly' as AvailabilityMode,
           blocks: [],
           totalHours: 0,
-          description: 'Vaste vrije dag',
+          description: language === 'nl' ? 'Vaste vrije dag' : 'Regular day off',
         };
       }
       let mins = endTimeToMinutes(daySched.endTime) - timeToMinutes(daySched.startTime);
@@ -1909,6 +1984,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!client) return { success: false, message: 'Client not found' };
 
     let usedPackage: ClientPackage | undefined = undefined;
+    let creditsToDeduct = 0;
     if (clientPackageId) {
       usedPackage = clientPackages.find(
         (cp) => cp.id === clientPackageId && cp.clientId === clientId
@@ -1916,8 +1992,12 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (!usedPackage) {
         return { success: false, message: 'Selected package was not found.' };
       }
-      if (usedPackage.remainingSessions <= 0) {
-        return { success: false, message: 'Selected package has 0 remaining sessions.' };
+      creditsToDeduct = calculatePackageCreditsForDuration(service.durationMinutes, usedPackage);
+      if (usedPackage.remainingSessions <= 0 || usedPackage.remainingSessions + 0.0001 < creditsToDeduct) {
+        return {
+          success: false,
+          message: `Selected package has insufficient remaining sessions (${usedPackage.remainingSessions} left, ${creditsToDeduct} needed).`,
+        };
       }
       if (usedPackage.expiresAt && usedPackage.expiresAt < date) {
         return { success: false, message: 'Selected package has expired.' };
@@ -1944,13 +2024,17 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       createdAt: formatDateISO(new Date()),
       packageId: usedPackage?.id,
       packageName: usedPackage?.packageName,
+      packageSessionsDeducted: usedPackage ? creditsToDeduct : undefined,
     };
 
     setAppointments((prev) => [newAppt, ...prev]);
 
-    // If a package was used, decrement remainingSessions
-    if (usedPackage) {
-      const remainingAfterDeduction = Math.max(0, usedPackage.remainingSessions - 1);
+    // If a package was used, decrement remainingSessions proportionally based on session duration
+    if (usedPackage && creditsToDeduct > 0) {
+      const remainingAfterDeduction = Math.max(
+        0,
+        Math.round((usedPackage.remainingSessions - creditsToDeduct) * 100) / 100
+      );
       setClientPackages((prev) =>
         prev.map((cp) =>
           cp.id === usedPackage!.id
@@ -1992,12 +2076,15 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     }
 
-    // If appointment was booked via a package, restore 1 session!
+    // If appointment was booked via a package, restore the exact number of deducted sessions!
     if (appt.packageId) {
       setClientPackages((prev) =>
         prev.map((cp) => {
           if (cp.id === appt.packageId) {
-            const updatedRemaining = cp.remainingSessions + 1;
+            const creditsToRestore =
+              appt.packageSessionsDeducted ??
+              calculatePackageCreditsForDuration(appt.durationMinutes, cp);
+            const updatedRemaining = Math.round((cp.remainingSessions + creditsToRestore) * 100) / 100;
             return {
               ...cp,
               remainingSessions: updatedRemaining,
@@ -2022,12 +2109,6 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           : a
       )
     );
-
-    const client = clients.find((c) => c.id === appt.clientId);
-    const service = settings.services.find((s) => s.id === appt.serviceId);
-    const packageRefundMsg = appt.packageId
-      ? `\n\nPackage Balance Restored: 1 session has been refunded to your "${appt.packageName || 'Package'}" balance.`
-      : '';
 
     return { success: true, message: 'Appointment cancelled successfully. Slot is now reopened.' };
   };
@@ -2055,6 +2136,43 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateAppointment = (appointmentId: string, updates: Partial<Appointment>) => {
+    const existingAppt = appointments.find((a) => a.id === appointmentId);
+    if (existingAppt && existingAppt.packageId && existingAppt.status !== 'cancelled') {
+      const nextServiceId = updates.serviceId ?? existingAppt.serviceId;
+      const service = settings.services.find((s) => s.id === nextServiceId);
+      const nextDuration =
+        updates.durationMinutes ?? (service ? service.durationMinutes : existingAppt.durationMinutes);
+      if (nextDuration !== existingAppt.durationMinutes) {
+        const linkedCp = clientPackages.find((cp) => cp.id === existingAppt.packageId);
+        if (linkedCp) {
+          const oldCredits =
+            existingAppt.packageSessionsDeducted ??
+            calculatePackageCreditsForDuration(existingAppt.durationMinutes, linkedCp);
+          const newCredits = calculatePackageCreditsForDuration(nextDuration, linkedCp);
+          const diff = oldCredits - newCredits;
+          if (diff !== 0) {
+            setClientPackages((prev) =>
+              prev.map((cp) => {
+                if (cp.id === linkedCp.id) {
+                  const updatedRemaining = Math.max(
+                    0,
+                    Math.round((cp.remainingSessions + diff) * 100) / 100
+                  );
+                  return {
+                    ...cp,
+                    remainingSessions: updatedRemaining,
+                    status: updatedRemaining > 0 ? 'active' : 'exhausted',
+                  };
+                }
+                return cp;
+              })
+            );
+          }
+          updates.packageSessionsDeducted = newCredits;
+        }
+      }
+    }
+
     setAppointments((prev) =>
       prev.map((a) => {
         if (a.id !== appointmentId) return a;
@@ -2082,7 +2200,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       setClientPackages((prev) =>
         prev.map((cp) => {
           if (cp.id === appt.packageId) {
-            const updatedRemaining = cp.remainingSessions + 1;
+            const creditsToRestore =
+              appt.packageSessionsDeducted ??
+              calculatePackageCreditsForDuration(appt.durationMinutes, cp);
+            const updatedRemaining = Math.round((cp.remainingSessions + creditsToRestore) * 100) / 100;
             return {
               ...cp,
               remainingSessions: updatedRemaining,
@@ -2552,25 +2673,185 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const resetDemoData = () => {
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_settings`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_clients`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_appointments`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_packages`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_clientPackages`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_messages`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_invoiceSettings`);
-    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_invoices`);
-    setSettings(initialSettings);
+    const restoredSettings: ProviderSettings = {
+      ...initialSettings,
+      name: settings.name,
+      profession: settings.profession,
+      email: settings.email,
+      phone: settings.phone,
+      standardHourlyRate: settings.standardHourlyRate,
+      currency: settings.currency,
+      availabilityMode: 'adhoc',
+    };
+    const restoredInvoiceSettings: InvoiceSettings = {
+      ...initialInvoiceSettings,
+      businessName: invoiceSettings.businessName || `${settings.name} Coaching`,
+      email: settings.email,
+      phone: settings.phone,
+    };
+
+    const prefixes = [userStoragePrefix, LOCAL_STORAGE_KEY];
+    prefixes.forEach((prefix) => {
+      localStorage.setItem(`${prefix}_settings`, JSON.stringify(restoredSettings));
+      localStorage.setItem(`${prefix}_clients`, JSON.stringify(initialClients));
+      localStorage.setItem(`${prefix}_appointments`, JSON.stringify(initialAppointments));
+      localStorage.setItem(`${prefix}_packages`, JSON.stringify(initialPackages));
+      localStorage.setItem(`${prefix}_clientPackages`, JSON.stringify(initialClientPackages));
+      localStorage.setItem(`${prefix}_messages`, JSON.stringify(initialMessages));
+      localStorage.setItem(`${prefix}_invoiceSettings`, JSON.stringify(restoredInvoiceSettings));
+      localStorage.setItem(`${prefix}_invoices`, JSON.stringify(initialInvoices));
+    });
+
+    prevSubcollectionsRef.current = {};
+    setSettings(restoredSettings);
     setClients(initialClients);
     setAppointments(initialAppointments);
     setPackages(initialPackages);
     setClientPackages(initialClientPackages);
     setMessages(initialMessages);
-    setInvoiceSettings(initialInvoiceSettings);
+    setInvoiceSettings(restoredInvoiceSettings);
     setInvoices(initialInvoices);
     setSelectedChatClientId('cli-1');
     setRole('provider');
     setActiveClientId('cli-1');
+  };
+
+  const clearDemoData = async (): Promise<void> => {
+    const cleanSettings: ProviderSettings = {
+      ...settings,
+      adHocSchedule: [],
+      exceptions: [],
+      services: [],
+      availabilityMode: 'adhoc',
+    };
+
+    const cleanInvoiceSettings: InvoiceSettings = {
+      ...invoiceSettings,
+      nextSequenceNumber: 1,
+    };
+
+    const knownItemsByCollection: Record<string, Array<{ id: string }>> = {
+      clients,
+      appointments,
+      availability: settings.adHocSchedule || [],
+      exceptions: settings.exceptions || [],
+      services: settings.services || [],
+      packages,
+      clientPackages,
+      messages,
+      invoices,
+    };
+
+    const prefixes = [userStoragePrefix, LOCAL_STORAGE_KEY];
+    prefixes.forEach((prefix) => {
+      localStorage.setItem(`${prefix}_settings`, JSON.stringify(cleanSettings));
+      localStorage.setItem(`${prefix}_clients`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_appointments`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_packages`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_clientPackages`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_messages`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_invoiceSettings`, JSON.stringify(cleanInvoiceSettings));
+      localStorage.setItem(`${prefix}_invoices`, JSON.stringify([]));
+    });
+
+    prevSubcollectionsRef.current = {};
+    setSettings(cleanSettings);
+    setClients([]);
+    setAppointments([]);
+    setPackages([]);
+    setClientPackages([]);
+    setMessages([]);
+    setInvoiceSettings(cleanInvoiceSettings);
+    setInvoices([]);
+    setSelectedChatClientId('');
+    setActiveClientId('');
+    setRole('provider');
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    const collectionNames = [
+      'clients',
+      'appointments',
+      'availability',
+      'exceptions',
+      'services',
+      'packages',
+      'clientPackages',
+      'messages',
+      'invoices',
+    ];
+
+    try {
+      await Promise.all(
+        collectionNames.map(async (colName) => {
+          const deletePromises: Promise<unknown>[] = [];
+          try {
+            const subSnap = await getDocs(collection(db, 'trainers', uid, colName));
+            subSnap.forEach((docSnap) => {
+              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
+            });
+          } catch {
+            // fallback to known items
+          }
+
+          const knownItems = knownItemsByCollection[colName] || [];
+          for (const item of knownItems) {
+            if (item?.id) {
+              deletePromises.push(
+                deleteDoc(doc(db, 'trainers', uid, colName, item.id)).catch(() => {})
+              );
+            }
+          }
+
+          if (deletePromises.length > 0) {
+            await Promise.all(deletePromises);
+          }
+        })
+      );
+
+      await Promise.all(
+        collectionNames.map(async (colName) => {
+          try {
+            const q = query(collection(db, colName), where('trainerId', '==', uid));
+            const topSnap = await getDocs(q);
+            const deletePromises: Promise<unknown>[] = [];
+            topSnap.forEach((docSnap) => {
+              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
+            });
+            if (deletePromises.length > 0) {
+              await Promise.all(deletePromises);
+            }
+          } catch {
+            // ignore
+          }
+        })
+      );
+
+      await setDoc(
+        doc(db, 'trainers', uid),
+        {
+          uid,
+          name: cleanSettings.name,
+          profession: cleanSettings.profession,
+          email: cleanSettings.email,
+          phone: cleanSettings.phone,
+          standardHourlyRate: cleanSettings.standardHourlyRate,
+          settings: cleanSettings,
+          invoiceSettings: cleanInvoiceSettings,
+          clients: [],
+          appointments: [],
+          packages: [],
+          clientPackages: [],
+          messages: [],
+          invoices: [],
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      formatFirestoreError(err, OperationType.WRITE, `trainers/${uid}`);
+    }
   };
 
   const deleteTrainerAccount = async (reauthOptions?: {
@@ -2753,6 +3034,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         clientPackages,
         purchasePackage,
         getClientActivePackages,
+        getPackageStandardDuration,
+        calculatePackageCreditsForDuration,
         adjustClientPackageBalance,
         grantClientPackage,
         updateClientPackage,
@@ -2801,6 +3084,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         selectedChatClientId,
         setSelectedChatClientId,
         resetDemoData,
+        clearDemoData,
         currentClient,
         magicLinkNotification,
         dismissMagicLinkNotification,

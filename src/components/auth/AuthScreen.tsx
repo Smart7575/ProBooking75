@@ -10,7 +10,16 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, formatFirestoreError, OperationType } from '../../firebase';
-import { initialSettings, initialInvoiceSettings } from '../../data/initialData';
+import {
+  initialSettings,
+  initialInvoiceSettings,
+  initialClients,
+  initialAppointments,
+  initialPackages,
+  initialClientPackages,
+  initialMessages,
+  initialInvoices,
+} from '../../data/initialData';
 import {
   Lock,
   Mail,
@@ -227,12 +236,12 @@ export const AuthScreen: React.FC = () => {
             ...(existingCloudDoc
               ? {}
               : {
-                  clients: [],
-                  appointments: [],
-                  packages: [],
-                  clientPackages: [],
-                  messages: [],
-                  invoices: [],
+                  clients: initialClients,
+                  appointments: initialAppointments,
+                  packages: initialPackages,
+                  clientPackages: initialClientPackages,
+                  messages: initialMessages,
+                  invoices: initialInvoices,
                   createdAt: new Date().toISOString(),
                 }),
             updatedAt: new Date().toISOString(),

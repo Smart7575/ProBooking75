@@ -64,6 +64,8 @@ export const ClientPortal: React.FC = () => {
     packages,
     clientPackages,
     getClientActivePackages,
+    getPackageStandardDuration,
+    calculatePackageCreditsForDuration,
     purchasePackage,
     updateClientContactDetails,
     getAvailableSlotsForDate,
@@ -152,19 +154,42 @@ export const ClientPortal: React.FC = () => {
   // Client's active packages that can cover the chosen service
   const applicableActivePackages = useMemo(() => {
     if (!currentClient || !selectedService) return [];
-    return getClientActivePackages(currentClient.id, selectedService.id);
+    return getClientActivePackages(
+      currentClient.id,
+      selectedService.id,
+      selectedService.durationMinutes
+    );
   }, [currentClient, selectedService, getClientActivePackages]);
 
-  // Default selected package when entering step 3
+  // Default selected package when entering step 3 (preserve pre-selected pass if valid)
   React.useEffect(() => {
     if (applicableActivePackages.length > 0) {
-      setSelectedPackageToRedeem(applicableActivePackages[0].id);
+      setSelectedPackageToRedeem((prev) =>
+        prev && applicableActivePackages.some((cp) => cp.id === prev)
+          ? prev
+          : applicableActivePackages[0].id
+      );
       setUsePackagePayment(true);
     } else {
       setSelectedPackageToRedeem('');
       setUsePackagePayment(false);
     }
   }, [applicableActivePackages, step]);
+
+  const selectedClientPackage = useMemo(() => {
+    return (
+      applicableActivePackages.find((cp) => cp.id === selectedPackageToRedeem) ||
+      applicableActivePackages[0]
+    );
+  }, [applicableActivePackages, selectedPackageToRedeem]);
+
+  const creditsToDeductForSelectedService = useMemo(() => {
+    if (!selectedService || !selectedClientPackage) return 1;
+    return calculatePackageCreditsForDuration(
+      selectedService.durationMinutes,
+      selectedClientPackage
+    );
+  }, [selectedService, selectedClientPackage, calculatePackageCreditsForDuration]);
 
   // Dynamic available slots calculation (auto-updates whenever appointments are booked or cancelled)
   const availableSlots = useMemo(() => {
@@ -259,13 +284,14 @@ export const ClientPortal: React.FC = () => {
         message: `${t.cancelBlockedMsg} (${settings.cancellationPolicyHours} hours cutoff). Please message ${settings.name} directly.`,
       });
     } else {
+      const refundedCredits = appt.packageSessionsDeducted ?? 1;
       setCancelWarning({
         apptId: appt.id,
         allowed: true,
         restoresPackage: hasPackage,
         message: `Are you sure you want to cancel your session on ${appt.date} at ${appt.startTime}? ${
           hasPackage
-            ? 'Because this was booked using your session bundle, 1 session credit will be automatically refunded to your package balance.'
+            ? `Because this was booked using your session bundle, ${refundedCredits} ${refundedCredits === 1 ? 'session credit' : 'session credits'} will be automatically refunded to your package balance.`
             : 'Your slot will be freed up for others.'
         }`,
       });
@@ -557,7 +583,7 @@ export const ClientPortal: React.FC = () => {
             {t.portalNavPackages}
             {myClientPackages.length > 0 && (
               <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] text-emerald-800">
-                {myClientPackages.reduce((sum, p) => sum + p.remainingSessions, 0)} left
+                {Math.round(myClientPackages.reduce((sum, p) => sum + p.remainingSessions, 0) * 100) / 100} left
               </span>
             )}
           </span>
@@ -684,12 +710,21 @@ export const ClientPortal: React.FC = () => {
                   );
 
                   // Check if client has a package covering this service
-                  const matchingPkgs = getClientActivePackages(currentClient.id, service.id);
-                  const hasPackageCover = matchingPkgs.length > 0;
-                  const totalSessionsLeft = matchingPkgs.reduce(
-                    (acc, p) => acc + p.remainingSessions,
-                    0
+                  const matchingPkgs = getClientActivePackages(
+                    currentClient.id,
+                    service.id,
+                    service.durationMinutes
                   );
+                  const hasPackageCover = matchingPkgs.length > 0;
+                  const activePkgForCard =
+                    matchingPkgs.find((p) => p.id === selectedPackageToRedeem) || matchingPkgs[0];
+                  const creditsForService = activePkgForCard
+                    ? calculatePackageCreditsForDuration(service.durationMinutes, activePkgForCard)
+                    : 1;
+                  const totalSessionsLeft =
+                    Math.round(
+                      matchingPkgs.reduce((acc, p) => acc + p.remainingSessions, 0) * 100
+                    ) / 100;
 
                   return (
                     <div
@@ -718,12 +753,14 @@ export const ClientPortal: React.FC = () => {
                       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                         <div>
                           {hasPackageCover ? (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                                Package Credit Available
+                                {language === 'nl'
+                                  ? `Pakket (-${creditsForService} ${creditsForService === 1 ? 'sessie' : 'sessies'})`
+                                  : `Package (-${creditsForService} ${creditsForService === 1 ? 'session' : 'sessions'})`}
                               </span>
                               <span className="text-[11px] text-slate-500">
-                                ({totalSessionsLeft} remaining)
+                                ({totalSessionsLeft} {language === 'nl' ? 'over' : 'remaining'})
                               </span>
                             </div>
                           ) : (
@@ -943,7 +980,11 @@ export const ClientPortal: React.FC = () => {
                       {bookedAppointment.packageId ? (
                         <div className="text-right">
                           <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                            Covered by Package
+                            Covered by Package (-{bookedAppointment.packageSessionsDeducted ?? 1}{' '}
+                            {(bookedAppointment.packageSessionsDeducted ?? 1) === 1
+                              ? 'session'
+                              : 'sessions'}
+                            )
                           </span>
                           <span className="block text-[10px] text-slate-400 mt-0.5">
                             {bookedAppointment.packageName || 'Session bundle credit deducted'}
@@ -1058,7 +1099,21 @@ export const ClientPortal: React.FC = () => {
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
-                                Deduct 1 credit from your prepaid package balance.
+                                {language === 'nl'
+                                  ? `Schrijf ${creditsToDeductForSelectedService} ${
+                                      creditsToDeductForSelectedService === 1 ? 'sessie' : 'sessies'
+                                    } af van je pakket (${selectedService.durationMinutes} min sessie / ${getPackageStandardDuration(
+                                      selectedClientPackage
+                                    )} min standaard pakketsessie).`
+                                  : `Deduct ${creditsToDeductForSelectedService} ${
+                                      creditsToDeductForSelectedService === 1
+                                        ? 'session credit'
+                                        : 'session credits'
+                                    } from your prepaid package balance (${
+                                      selectedService.durationMinutes
+                                    } min session / ${getPackageStandardDuration(
+                                      selectedClientPackage
+                                    )} min standard package session).`}
                               </p>
 
                               {usePackagePayment && (
@@ -1071,12 +1126,20 @@ export const ClientPortal: React.FC = () => {
                                     onChange={(e) => setSelectedPackageToRedeem(e.target.value)}
                                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 font-semibold focus:border-emerald-500"
                                   >
-                                    {applicableActivePackages.map((cp) => (
-                                      <option key={cp.id} value={cp.id}>
-                                        {cp.packageName} — ({cp.remainingSessions} sessions left
-                                        {cp.expiresAt ? `, expires ${cp.expiresAt}` : ''})
-                                      </option>
-                                    ))}
+                                    {applicableActivePackages.map((cp) => {
+                                      const cpStdDur = getPackageStandardDuration(cp);
+                                      const cpDeduct = calculatePackageCreditsForDuration(
+                                        selectedService.durationMinutes,
+                                        cp
+                                      );
+                                      return (
+                                        <option key={cp.id} value={cp.id}>
+                                          {cp.packageName} — ({Number(cp.remainingSessions.toFixed(2))}{' '}
+                                          sessions left • 1 session = {cpStdDur}m → -{cpDeduct}
+                                          {cp.expiresAt ? `, expires ${cp.expiresAt}` : ''})
+                                        </option>
+                                      );
+                                    })}
                                   </select>
                                 </div>
                               )}
@@ -1175,7 +1238,11 @@ export const ClientPortal: React.FC = () => {
                       className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition"
                     >
                       {t.confirmBookingBtn} (
-                      {usePackagePayment && selectedPackageToRedeem ? 'Use 1 Credit' : formatPrice(calculatedPrice)}
+                      {usePackagePayment && selectedPackageToRedeem
+                        ? `Use ${creditsToDeductForSelectedService} ${
+                            creditsToDeductForSelectedService === 1 ? 'Credit' : 'Credits'
+                          }`
+                        : formatPrice(calculatedPrice)}
                       )
                     </button>
                   </div>
@@ -1396,6 +1463,7 @@ export const ClientPortal: React.FC = () => {
                 {myClientPackages.map((cp) => {
                   const percentage = Math.round((cp.remainingSessions / cp.totalSessions) * 100);
                   const isAvailable = cp.remainingSessions > 0 && cp.status === 'active';
+                  const stdDuration = getPackageStandardDuration(cp);
 
                   return (
                     <div
@@ -1424,7 +1492,7 @@ export const ClientPortal: React.FC = () => {
                         <div className="mt-3">
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span className="font-semibold text-slate-700">
-                              {cp.remainingSessions} of {cp.totalSessions} sessions remaining
+                              {Number(cp.remainingSessions.toFixed(2))} of {cp.totalSessions} sessions remaining
                             </span>
                             <span className="font-bold text-slate-900">{percentage}%</span>
                           </div>
@@ -1438,7 +1506,14 @@ export const ClientPortal: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="mt-3 text-xs text-slate-500 space-y-0.5">
+                        <div className="mt-3 text-xs text-slate-500 space-y-1">
+                          <div>
+                            {language === 'nl' ? 'Standaard sessieduur:' : 'Standard session duration:'}{' '}
+                            <strong className="text-slate-700">{stdDuration} min</strong>{' '}
+                            <span className="text-[11px] text-slate-400">
+                              ({Math.round(stdDuration / 2)}m = 0.5 • {Math.round(stdDuration * 1.5)}m = 1.5)
+                            </span>
+                          </div>
                           <div>
                             Expires: <strong>{cp.expiresAt ? cp.expiresAt : t.noExpiration}</strong>
                           </div>
@@ -1449,10 +1524,13 @@ export const ClientPortal: React.FC = () => {
                         <div className="mt-4 pt-3 border-t border-slate-200/80">
                           <button
                             onClick={() => {
+                              setSelectedPackageToRedeem(cp.id);
+                              setUsePackagePayment(true);
+                              setBookedAppointment(null);
                               setActiveTab('book');
                               setStep(1);
                             }}
-                            className="w-full rounded-xl bg-emerald-600 py-2 text-center text-xs font-semibold text-white hover:bg-emerald-500 transition"
+                            className="w-full rounded-xl bg-emerald-600 py-2 text-center text-xs font-semibold text-white hover:bg-emerald-500 transition cursor-pointer"
                           >
                             Book Session with this Pass
                           </button>
@@ -1486,6 +1564,7 @@ export const ClientPortal: React.FC = () => {
                   .filter((p) => p.isActive)
                   .map((pkg) => {
                     const linkedService = services.find((s) => s.id === pkg.serviceId);
+                    const stdDur = getPackageStandardDuration(undefined, pkg);
                     const perSession = pkg.sessionCount > 0 ? pkg.price / pkg.sessionCount : 0;
                     const savings =
                       pkg.originalValue && pkg.originalValue > pkg.price
@@ -1498,10 +1577,15 @@ export const ClientPortal: React.FC = () => {
                         className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition"
                       >
                         <div>
-                          <div className="flex items-center justify-between gap-1.5 mb-2">
-                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                              {pkg.sessionCount} Sessions
-                            </span>
+                          <div className="flex items-center justify-between gap-1.5 mb-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                                {pkg.sessionCount} Sessions
+                              </span>
+                              <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200">
+                                {stdDur} min / session
+                              </span>
+                            </div>
                             {pkg.featured && (
                               <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200 flex items-center gap-1">
                                 <Sparkles className="h-3 w-3" /> Popular

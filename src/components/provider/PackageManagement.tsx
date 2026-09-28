@@ -28,6 +28,7 @@ export const PackageManagement: React.FC = () => {
     updatePackage,
     deletePackage,
     clientPackages,
+    getPackageStandardDuration,
     adjustClientPackageBalance,
     grantClientPackage,
     deleteClientPackage,
@@ -63,6 +64,7 @@ export const PackageManagement: React.FC = () => {
     description: '',
     serviceId: undefined, // undefined means universal
     sessionCount: 10,
+    sessionDurationMinutes: 60,
     price: 550,
     originalValue: 650,
     validityDays: 120,
@@ -78,6 +80,7 @@ export const PackageManagement: React.FC = () => {
       description: '',
       serviceId: undefined,
       sessionCount: 10,
+      sessionDurationMinutes: 60,
       price: 550,
       originalValue: 650,
       validityDays: 120,
@@ -95,6 +98,7 @@ export const PackageManagement: React.FC = () => {
       description: pkg.description,
       serviceId: pkg.serviceId,
       sessionCount: pkg.sessionCount,
+      sessionDurationMinutes: getPackageStandardDuration(undefined, pkg),
       price: pkg.price,
       originalValue: pkg.originalValue || pkg.price,
       validityDays: pkg.validityDays,
@@ -133,8 +137,8 @@ export const PackageManagement: React.FC = () => {
 
   // Calculate quick metrics
   const totalPackagesSold = clientPackages.length;
-  const totalSessionsSold = clientPackages.reduce((acc, cp) => acc + cp.totalSessions, 0);
-  const totalRemainingSessions = clientPackages.reduce((acc, cp) => acc + cp.remainingSessions, 0);
+  const totalSessionsSold = Math.round(clientPackages.reduce((acc, cp) => acc + cp.totalSessions, 0) * 100) / 100;
+  const totalRemainingSessions = Math.round(clientPackages.reduce((acc, cp) => acc + cp.remainingSessions, 0) * 100) / 100;
   const totalPackageRevenue = clientPackages.reduce((acc, cp) => acc + cp.pricePaid, 0);
 
   return (
@@ -243,6 +247,7 @@ export const PackageManagement: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {packages.map((pkg) => {
             const linkedService = services.find((s) => s.id === pkg.serviceId);
+            const stdDuration = getPackageStandardDuration(undefined, pkg);
             const pricePerSession = pkg.sessionCount > 0 ? pkg.price / pkg.sessionCount : 0;
             const savings =
               pkg.originalValue && pkg.originalValue > pkg.price
@@ -259,7 +264,11 @@ export const PackageManagement: React.FC = () => {
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                        {pkg.sessionCount} Sessions
+                        {pkg.sessionCount} {language === 'nl' ? 'Sessies' : 'Sessions'}
+                      </span>
+                      <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {stdDuration} min / {language === 'nl' ? 'sessie' : 'session'}
                       </span>
                       {pkg.featured && (
                         <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200 flex items-center gap-1">
@@ -303,12 +312,22 @@ export const PackageManagement: React.FC = () => {
                     {pkg.description || 'No description specified.'}
                   </p>
 
-                  {/* Service Badge */}
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="text-[11px] font-medium text-slate-400">Applies to:</span>
-                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
-                      {linkedService ? linkedService.name : 'Universal (All Services)'}
-                    </span>
+                  {/* Service & Standard Session Duration Badge */}
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-slate-400">
+                        {language === 'nl' ? 'Standaard sessieduur:' : 'Standard session:'}
+                      </span>
+                      <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                        {stdDuration} min ({language === 'nl' ? '1 sessie' : '1 session credit'})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-slate-400">Applies to:</span>
+                      <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                        {linkedService ? linkedService.name : 'Universal (All Services)'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Validity */}
@@ -429,6 +448,7 @@ export const PackageManagement: React.FC = () => {
                   {clientPackages.map((cp) => {
                     const client = activeClients.find((c) => c.id === cp.clientId);
                     const percentage = Math.round((cp.remainingSessions / cp.totalSessions) * 100);
+                    const stdDur = getPackageStandardDuration(cp);
 
                     return (
                       <tr key={cp.id} className="hover:bg-slate-50/70 transition">
@@ -441,7 +461,7 @@ export const PackageManagement: React.FC = () => {
                         <td className="px-5 py-4">
                           <span className="font-semibold text-slate-800">{cp.packageName}</span>
                           <span className="block text-[11px] text-slate-400">
-                            {formatPrice(cp.pricePaid)} paid
+                            {formatPrice(cp.pricePaid)} paid • 1 {language === 'nl' ? 'sessie' : 'session'} = {stdDur}m
                           </span>
                         </td>
                         <td className="px-5 py-4">
@@ -459,7 +479,7 @@ export const PackageManagement: React.FC = () => {
                               ></div>
                             </div>
                             <span className="font-bold text-slate-900">
-                              {cp.remainingSessions} / {cp.totalSessions}
+                              {Number(cp.remainingSessions.toFixed(2))} / {cp.totalSessions}
                             </span>
                           </div>
                         </td>
@@ -481,7 +501,7 @@ export const PackageManagement: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => adjustClientPackageBalance(cp.id, -1)}
                               disabled={cp.remainingSessions <= 0}
@@ -489,6 +509,21 @@ export const PackageManagement: React.FC = () => {
                               title="Deduct 1 session manually"
                             >
                               -1
+                            </button>
+                            <button
+                              onClick={() => adjustClientPackageBalance(cp.id, -0.5)}
+                              disabled={cp.remainingSessions <= 0}
+                              className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none transition"
+                              title="Deduct 0.5 session manually"
+                            >
+                              -0.5
+                            </button>
+                            <button
+                              onClick={() => adjustClientPackageBalance(cp.id, 0.5)}
+                              className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+                              title="Add 0.5 session credit"
+                            >
+                              +0.5
                             </button>
                             <button
                               onClick={() => adjustClientPackageBalance(cp.id, 1)}
@@ -603,7 +638,7 @@ export const PackageManagement: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Standard Value ({currencySymbol}) <span className="font-normal text-slate-400">(for discount %)</span>
+                  Standard Value <span className="font-normal text-slate-400">(for discount %)</span>
                 </label>
                 <input
                   type="number"
@@ -619,6 +654,69 @@ export const PackageManagement: React.FC = () => {
                   }
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
                 />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>
+                      {language === 'nl'
+                        ? 'Standaard sessieduur van dit pakket (minuten) *'
+                        : 'Standard Session Duration (minutes) *'}
+                    </span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={15}
+                    max={480}
+                    step={5}
+                    required
+                    value={formData.sessionDurationMinutes || 60}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        sessionDurationMinutes: parseInt(e.target.value) || 60,
+                      })
+                    }
+                    className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+                  />
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {[30, 45, 60, 75, 90, 120].map((mins) => (
+                      <button
+                        type="button"
+                        key={mins}
+                        onClick={() => setFormData({ ...formData, sessionDurationMinutes: mins })}
+                        className={`rounded-lg px-2 py-1 text-[10px] font-semibold border transition cursor-pointer ${
+                          (formData.sessionDurationMinutes || 60) === mins
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {mins === 60
+                          ? language === 'nl'
+                            ? '60m (1 uur)'
+                            : '60m (1 hr)'
+                          : mins === 90
+                          ? language === 'nl'
+                            ? '90m (1,5u)'
+                            : '90m (1.5h)'
+                          : mins === 120
+                          ? language === 'nl'
+                            ? '120m (2u)'
+                            : '120m (2h)'
+                          : `${mins}m`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  {language === 'nl'
+                    ? `1 sessie = ${formData.sessionDurationMinutes || 60} min. Bij het plannen van een sessie van ${Math.round((formData.sessionDurationMinutes || 60) / 2)} min wordt 0,5 sessie afgeschreven; bij ${Math.round((formData.sessionDurationMinutes || 60) * 1.5)} min wordt 1,5 sessie afgeschreven.`
+                    : `1 session = ${formData.sessionDurationMinutes || 60} min. Booking a ${Math.round((formData.sessionDurationMinutes || 60) / 2)}-min session deducts 0.5 session; booking a ${Math.round((formData.sessionDurationMinutes || 60) * 1.5)}-min session deducts 1.5 sessions.`}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-2.5">
