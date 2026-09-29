@@ -24,6 +24,7 @@ export interface Client {
   specialNotes?: string; // alias for notes
   avatarUrl?: string;
   customHourlyRate?: number; // Overrides provider standard rate if set
+  customHourlyRateIncludesVat?: boolean; // true = incl. VAT, false = excl. VAT
   magicToken: string;
   isArchived?: boolean;
   createdAt: string;
@@ -70,6 +71,7 @@ export interface ProviderSettings {
   email: string;
   phone: string;
   standardHourlyRate: number; // e.g. 65 EUR / USD / CHF
+  ratesIncludeVat?: boolean; // true = incl. VAT, false = excl. VAT
   currency: SupportedCurrency | string; // 'EUR' (€), 'USD' ($), or 'CHF' (CHF)
   standardSlotDuration: number; // e.g. 60 min
   bufferMinutes: number;      // e.g. 15 min
@@ -111,6 +113,7 @@ export interface BillingItem {
   title: string;
   description?: string;
   amount: number;
+  isVatInclusive?: boolean; // true = amount is incl. VAT, false = amount is excl. VAT
   status: BillingStatus;
   invoicedAt?: string;
   paidAt?: string;
@@ -187,6 +190,9 @@ export interface InvoiceLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  baseAmount?: number; // Original rate/price before VAT split
+  isVatInclusive?: boolean; // Whether baseAmount is inclusive of VAT
+  isVatExempt?: boolean; // True when exempt from VAT ("Vrijgesteld van BTW"), false when 0% or other VAT rate
   vatRate: number; // e.g. 21, 9, 0
   vatAmount: number;
   total: number;
@@ -232,6 +238,12 @@ export interface Invoice {
   paidAt?: string; // ISO
   archived?: boolean;
   isVatExempt?: boolean;
+  // Credit note fields
+  isCreditNote?: boolean;
+  originalInvoiceId?: string;
+  originalInvoiceNumber?: string;
+  creditNoteId?: string;
+  creditNoteNumber?: string;
 }
 
 export interface InvoiceSettings {
@@ -251,10 +263,13 @@ export interface InvoiceSettings {
   bankName: string;
   paymentTermDays: number;
   defaultVatRate: number; // e.g., 21, 9, 0
+  vatRates?: number[]; // Custom list of VAT rates (e.g., [0, 9, 21])
   isVatExempt?: boolean;
   numberPrefix: string; // e.g., "FACT-{YYYY}-"
   numberPadding: number; // e.g., 4
   nextSequenceNumber: number; // e.g., 2
+  creditNotePrefix?: string; // e.g., "CN-{YYYY}-"
+  nextCreditNoteSequenceNumber?: number; // e.g., 1
   invoiceNotes: string;
 }
 

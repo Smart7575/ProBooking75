@@ -80,7 +80,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
   // Grant Package modal state
   const [grantModalClient, setGrantModalClient] = useState<Client | null>(null);
   const [selectedPackageId, setSelectedPackageId] = useState<string>('');
-  const [customSessions, setCustomSessions] = useState<number>(10);
+  const [customSessions, setCustomSessions] = useState<number | string>(10);
 
   // Bulk selection & messaging state
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -104,6 +104,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     dateOfBirth: '',
     notes: '',
     customHourlyRate: '',
+    customHourlyRateIncludesVat: settings.ratesIncludeVat ?? true,
   });
 
   const resetForm = () => {
@@ -118,6 +119,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       dateOfBirth: '',
       notes: '',
       customHourlyRate: '',
+      customHourlyRateIncludesVat: settings.ratesIncludeVat ?? true,
     });
   };
 
@@ -139,16 +141,18 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       dateOfBirth: client.dateOfBirth || '',
       notes: client.notes || '',
       customHourlyRate: client.customHourlyRate !== undefined ? String(client.customHourlyRate) : '',
+      customHourlyRateIncludesVat:
+        client.customHourlyRateIncludesVat ?? (settings.ratesIncludeVat ?? true),
     });
   };
 
   const handleSubmitAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email) return;
+    if (!formData.name.trim()) return;
 
     addClient({
-      name: formData.name || formData.email.split('@')[0],
-      email: formData.email,
+      name: formData.name.trim(),
+      email: formData.email.trim(),
       phone: formData.phone || '',
       address: formData.address,
       postalCode: formData.postalCode,
@@ -157,6 +161,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       dateOfBirth: formData.dateOfBirth || undefined,
       notes: formData.notes,
       customHourlyRate: formData.customHourlyRate ? Number(formData.customHourlyRate) : undefined,
+      customHourlyRateIncludesVat: formData.customHourlyRateIncludesVat,
     });
 
     setIsAddModalOpen(false);
@@ -178,6 +183,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       dateOfBirth: formData.dateOfBirth || undefined,
       notes: formData.notes,
       customHourlyRate: formData.customHourlyRate ? Number(formData.customHourlyRate) : undefined,
+      customHourlyRateIncludesVat: formData.customHourlyRateIncludesVat,
     });
 
     setEditingClient(null);
@@ -185,8 +191,10 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
   };
 
   const handleCopyMagicLink = (client: Client) => {
-    const details = getMagicLinkDetails(client.magicToken);
-    // Copy the public shared link (or in-app if not in dev)
+    const details = getMagicLinkDetails(
+      client.magicToken,
+      (client as any).trainerId || (client as any).userId
+    );
     const linkToCopy = details.publicSharedUrl;
     navigator.clipboard?.writeText(linkToCopy);
     setCopiedTokenId(client.id);
@@ -218,7 +226,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
   const handleConfirmGrant = (e: React.FormEvent) => {
     e.preventDefault();
     if (!grantModalClient || !selectedPackageId) return;
-    grantClientPackage(grantModalClient.id, selectedPackageId, customSessions);
+    grantClientPackage(grantModalClient.id, selectedPackageId, Math.max(1, Number(customSessions) || 1));
     setGrantModalClient(null);
   };
 
@@ -228,8 +236,8 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     const q = searchTerm.toLowerCase();
     const matchesSearch =
       c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.phone.toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.phone || '').toLowerCase().includes(q) ||
       (c.city && c.city.toLowerCase().includes(q));
     return matchesArchived && matchesSearch;
   });
@@ -447,7 +455,16 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                         </h3>
                       {client.customHourlyRate && (
                         <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200" title={language === 'nl' ? 'Afwijkend uurtarief' : 'Custom override rate'}>
-                          {formatPrice(client.customHourlyRate)}/h
+                          {formatPrice(client.customHourlyRate)}/h{' '}
+                          <span className="font-normal opacity-80">
+                            ({(client.customHourlyRateIncludesVat ?? settings.ratesIncludeVat ?? true)
+                              ? language === 'nl'
+                                ? 'incl. BTW'
+                                : 'incl. VAT'
+                              : language === 'nl'
+                              ? 'excl. BTW'
+                              : 'excl. VAT'})
+                          </span>
                         </span>
                       )}
                       {totalRemainingSessions > 0 ? (
@@ -481,10 +498,12 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                         </span>
                       )}
                     </div>
-                      <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
-                        <Mail className="h-3 w-3 text-slate-400" />
-                        {client.email}
-                      </span>
+                      {client.email && (
+                        <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                          <Mail className="h-3 w-3 text-slate-400" />
+                          {client.email}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -811,33 +830,33 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             <form onSubmit={handleSubmitAdd} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {t.clientEmail} <span className="text-rose-500">*</span>
+                  {t.clientName} <span className="text-rose-500">*</span>
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   required
-                  placeholder="client@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder={language === 'nl' ? 'Linda de Vries' : 'Sarah Connor'}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {t.autoInviteNotice}
-                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.clientName}
+                    {t.clientEmail}
                   </label>
                   <input
-                    type="text"
-                    placeholder={language === 'nl' ? 'Linda de Vries' : 'Sarah Connor'}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    type="email"
+                    placeholder="client@example.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {t.autoInviteNotice}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -917,6 +936,46 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     onChange={(e) => setFormData({ ...formData, customHourlyRate: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.customHourlyRateIncludesVat === false}
+                        onChange={() =>
+                          setFormData({ ...formData, customHourlyRateIncludesVat: false })
+                        }
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                      />
+                      <span
+                        className={`text-[11px] font-bold ${
+                          formData.customHourlyRateIncludesVat === false
+                            ? 'text-emerald-700'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                      </span>
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.customHourlyRateIncludesVat !== false}
+                        onChange={() =>
+                          setFormData({ ...formData, customHourlyRateIncludesVat: true })
+                        }
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                      />
+                      <span
+                        className={`text-[11px] font-bold ${
+                          formData.customHourlyRateIncludesVat !== false
+                            ? 'text-emerald-700'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -978,7 +1037,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.clientName}
+                    {t.clientName} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -994,7 +1053,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   </label>
                   <input
                     type="email"
-                    required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -1026,6 +1084,46 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     onChange={(e) => setFormData({ ...formData, customHourlyRate: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.customHourlyRateIncludesVat === false}
+                        onChange={() =>
+                          setFormData({ ...formData, customHourlyRateIncludesVat: false })
+                        }
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                      />
+                      <span
+                        className={`text-[11px] font-bold ${
+                          formData.customHourlyRateIncludesVat === false
+                            ? 'text-emerald-700'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                      </span>
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.customHourlyRateIncludesVat !== false}
+                        onChange={() =>
+                          setFormData({ ...formData, customHourlyRateIncludesVat: true })
+                        }
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                      />
+                      <span
+                        className={`text-[11px] font-bold ${
+                          formData.customHourlyRateIncludesVat !== false
+                            ? 'text-emerald-700'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -1213,7 +1311,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   min="1"
                   max="100"
                   value={customSessions}
-                  onChange={(e) => setCustomSessions(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => setCustomSessions(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 outline-none transition font-medium"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">

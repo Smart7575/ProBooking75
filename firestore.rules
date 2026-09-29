@@ -21,6 +21,16 @@ service cloud.firestore {
       return isSignedIn() && request.resource.data.trainerId == request.auth.uid;
     }
 
+    match /users/{userId} {
+      allow read, create, update: if true;
+      allow delete: if isOwner(userId);
+
+      match /{subcollection}/{docId} {
+        allow read, create, update: if true;
+        allow delete: if isOwner(userId);
+      }
+    }
+
     match /trainers/{trainerId} {
       allow read, create, update: if true;
       allow delete: if isOwner(trainerId);

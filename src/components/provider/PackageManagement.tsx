@@ -55,11 +55,24 @@ export const PackageManagement: React.FC = () => {
   const [grantPackageId, setGrantPackageId] = useState<string>(
     packages.length > 0 ? packages[0].id : ''
   );
-  const [grantCustomSessions, setGrantCustomSessions] = useState<number>(10);
+  const [grantCustomSessions, setGrantCustomSessions] = useState<number | string>(10);
   const [grantSuccessMsg, setGrantSuccessMsg] = useState<string | null>(null);
 
   // Form state for creating / editing package
-  const [formData, setFormData] = useState<Omit<ServicePackage, 'id'>>({
+  const [neverExpires, setNeverExpires] = useState<boolean>(false);
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    serviceId?: string;
+    sessionCount: number | string;
+    sessionDurationMinutes: number | string;
+    price: number | string;
+    originalValue?: number | string;
+    validityDays?: number | string;
+    color: string;
+    isActive: boolean;
+    featured: boolean;
+  }>({
     name: '',
     description: '',
     serviceId: undefined, // undefined means universal
@@ -75,6 +88,7 @@ export const PackageManagement: React.FC = () => {
 
   const openCreateModal = () => {
     setEditingPackageId(null);
+    setNeverExpires(false);
     setFormData({
       name: '',
       description: '',
@@ -93,6 +107,8 @@ export const PackageManagement: React.FC = () => {
 
   const openEditModal = (pkg: ServicePackage) => {
     setEditingPackageId(pkg.id);
+    const isUnrestricted = !pkg.validityDays || pkg.validityDays === 0;
+    setNeverExpires(isUnrestricted);
     setFormData({
       name: pkg.name,
       description: pkg.description,
@@ -100,8 +116,8 @@ export const PackageManagement: React.FC = () => {
       sessionCount: pkg.sessionCount,
       sessionDurationMinutes: getPackageStandardDuration(undefined, pkg),
       price: pkg.price,
-      originalValue: pkg.originalValue || pkg.price,
-      validityDays: pkg.validityDays,
+      originalValue: pkg.originalValue ?? '',
+      validityDays: isUnrestricted ? 90 : pkg.validityDays,
       color: pkg.color || '#10b981',
       isActive: pkg.isActive,
       featured: pkg.featured || false,
@@ -113,10 +129,35 @@ export const PackageManagement: React.FC = () => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
+    const parsedSessions = Math.max(1, parseInt(String(formData.sessionCount), 10) || 1);
+    const parsedDuration = Math.max(5, parseInt(String(formData.sessionDurationMinutes), 10) || 60);
+    const parsedPrice = Math.max(0, parseFloat(String(formData.price)) || 0);
+    const parsedOriginal =
+      formData.originalValue !== '' && formData.originalValue !== undefined
+        ? parseFloat(String(formData.originalValue))
+        : undefined;
+    const parsedValidity = neverExpires
+      ? undefined
+      : Math.max(1, parseInt(String(formData.validityDays), 10) || 90);
+
+    const payload: Omit<ServicePackage, 'id'> = {
+      name: formData.name.trim(),
+      description: formData.description,
+      serviceId: formData.serviceId,
+      sessionCount: parsedSessions,
+      sessionDurationMinutes: parsedDuration,
+      price: parsedPrice,
+      originalValue: parsedOriginal !== undefined && !isNaN(parsedOriginal) ? parsedOriginal : undefined,
+      validityDays: parsedValidity,
+      color: formData.color,
+      isActive: formData.isActive,
+      featured: formData.featured,
+    };
+
     if (editingPackageId) {
-      updatePackage(editingPackageId, formData);
+      updatePackage(editingPackageId, payload);
     } else {
-      addPackage(formData);
+      addPackage(payload);
     }
     setIsModalOpen(false);
   };
@@ -125,7 +166,7 @@ export const PackageManagement: React.FC = () => {
     e.preventDefault();
     if (!grantClientId || !grantPackageId) return;
 
-    grantClientPackage(grantClientId, grantPackageId, Number(grantCustomSessions));
+    grantClientPackage(grantClientId, grantPackageId, Math.max(1, Number(grantCustomSessions) || 1));
     const client = activeClients.find((c) => c.id === grantClientId);
     const pkg = packages.find((p) => p.id === grantPackageId);
     setGrantSuccessMsg(`Successfully granted ${pkg?.name || 'Bundle'} to ${client?.name || 'client'}!`);
@@ -612,7 +653,7 @@ export const PackageManagement: React.FC = () => {
                     required
                     value={formData.sessionCount}
                     onChange={(e) =>
-                      setFormData({ ...formData, sessionCount: parseInt(e.target.value) || 1 })
+                      setFormData({ ...formData, sessionCount: e.target.value })
                     }
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
                   />
@@ -629,7 +670,7 @@ export const PackageManagement: React.FC = () => {
                     required
                     value={formData.price}
                     onChange={(e) =>
-                      setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })
+                      setFormData({ ...formData, price: e.target.value })
                     }
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
                   />
@@ -645,11 +686,11 @@ export const PackageManagement: React.FC = () => {
                   step="0.01"
                   min={0}
                   placeholder="e.g. 650"
-                  value={formData.originalValue || ''}
+                  value={formData.originalValue ?? ''}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      originalValue: e.target.value ? parseFloat(e.target.value) : undefined,
+                      originalValue: e.target.value,
                     })
                   }
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
@@ -674,11 +715,11 @@ export const PackageManagement: React.FC = () => {
                     max={480}
                     step={5}
                     required
-                    value={formData.sessionDurationMinutes || 60}
+                    value={formData.sessionDurationMinutes}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        sessionDurationMinutes: parseInt(e.target.value) || 60,
+                        sessionDurationMinutes: e.target.value,
                       })
                     }
                     className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-900 focus:border-emerald-500 focus:outline-hidden"
@@ -690,7 +731,7 @@ export const PackageManagement: React.FC = () => {
                         key={mins}
                         onClick={() => setFormData({ ...formData, sessionDurationMinutes: mins })}
                         className={`rounded-lg px-2 py-1 text-[10px] font-semibold border transition cursor-pointer ${
-                          (formData.sessionDurationMinutes || 60) === mins
+                          (Number(formData.sessionDurationMinutes) || 60) === mins
                             ? 'bg-emerald-600 text-white border-emerald-600'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
@@ -714,8 +755,8 @@ export const PackageManagement: React.FC = () => {
                 </div>
                 <p className="text-[11px] text-slate-500 leading-snug">
                   {language === 'nl'
-                    ? `1 sessie = ${formData.sessionDurationMinutes || 60} min. Bij het plannen van een sessie van ${Math.round((formData.sessionDurationMinutes || 60) / 2)} min wordt 0,5 sessie afgeschreven; bij ${Math.round((formData.sessionDurationMinutes || 60) * 1.5)} min wordt 1,5 sessie afgeschreven.`
-                    : `1 session = ${formData.sessionDurationMinutes || 60} min. Booking a ${Math.round((formData.sessionDurationMinutes || 60) / 2)}-min session deducts 0.5 session; booking a ${Math.round((formData.sessionDurationMinutes || 60) * 1.5)}-min session deducts 1.5 sessions.`}
+                    ? `1 sessie = ${Number(formData.sessionDurationMinutes) || 60} min. Bij het plannen van een sessie van ${Math.round((Number(formData.sessionDurationMinutes) || 60) / 2)} min wordt 0,5 sessie afgeschreven; bij ${Math.round((Number(formData.sessionDurationMinutes) || 60) * 1.5)} min wordt 1,5 sessie afgeschreven.`
+                    : `1 session = ${Number(formData.sessionDurationMinutes) || 60} min. Booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) / 2)}-min session deducts 0.5 session; booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) * 1.5)}-min session deducts 1.5 sessions.`}
                 </p>
               </div>
 
@@ -727,13 +768,16 @@ export const PackageManagement: React.FC = () => {
                   <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      checked={!formData.validityDays || formData.validityDays === 0}
+                      checked={neverExpires}
                       onChange={(e) => {
                         const never = e.target.checked;
-                        setFormData({
-                          ...formData,
-                          validityDays: never ? undefined : 90,
-                        });
+                        setNeverExpires(never);
+                        if (!never && (!formData.validityDays || Number(formData.validityDays) <= 0)) {
+                          setFormData({
+                            ...formData,
+                            validityDays: 90,
+                          });
+                        }
                       }}
                       className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                     />
@@ -742,7 +786,7 @@ export const PackageManagement: React.FC = () => {
                   </label>
                 </div>
 
-                {!formData.validityDays || formData.validityDays === 0 ? (
+                {neverExpires ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-2.5 flex items-start gap-2 text-xs text-emerald-900">
                     <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
@@ -760,12 +804,11 @@ export const PackageManagement: React.FC = () => {
                         min={1}
                         max={3650}
                         placeholder="e.g. 90"
-                        value={formData.validityDays || ''}
+                        value={formData.validityDays ?? ''}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value);
                           setFormData({
                             ...formData,
-                            validityDays: !isNaN(val) && val > 0 ? val : undefined,
+                            validityDays: e.target.value,
                           });
                         }}
                         className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
@@ -784,7 +827,7 @@ export const PackageManagement: React.FC = () => {
                           key={days}
                           onClick={() => setFormData({ ...formData, validityDays: days })}
                           className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold border transition cursor-pointer ${
-                            formData.validityDays === days
+                            Number(formData.validityDays) === days
                               ? 'bg-emerald-600 text-white border-emerald-600'
                               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                           }`}
@@ -943,7 +986,7 @@ export const PackageManagement: React.FC = () => {
                     min={1}
                     max={100}
                     value={grantCustomSessions}
-                    onChange={(e) => setGrantCustomSessions(parseInt(e.target.value) || 1)}
+                    onChange={(e) => setGrantCustomSessions(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">

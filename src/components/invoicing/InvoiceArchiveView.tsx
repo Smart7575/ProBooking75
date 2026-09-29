@@ -17,6 +17,7 @@ import {
   Calendar,
   DollarSign,
   X,
+  RotateCcw,
 } from 'lucide-react';
 
 interface InvoiceArchiveViewProps {
@@ -33,6 +34,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
   const {
     invoices,
     clients,
+    createCreditNote,
     markInvoicePaid,
     deleteInvoice,
     formatPrice,
@@ -296,99 +298,177 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className="hover:bg-slate-50/80 transition cursor-pointer"
-                    onClick={() => onOpenInvoicePdf(inv)}
-                  >
-                    {/* Invoice Number */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-blue-600 hover:underline">{inv.invoiceNumber}</span>
-                      </div>
-                    </td>
+                filteredInvoices.map((inv) => {
+                  const linkedCreditNote = !inv.isCreditNote
+                    ? invoices.find(
+                        (other) =>
+                          other.isCreditNote &&
+                          (other.originalInvoiceId === inv.id ||
+                            other.originalInvoiceNumber === inv.invoiceNumber)
+                      )
+                    : undefined;
+                  const creditNoteNum = inv.creditNoteNumber || linkedCreditNote?.invoiceNumber;
 
-                    {/* Issue Date */}
-                    <td className="py-3.5 px-3 text-slate-600 font-medium whitespace-nowrap">
-                      {inv.issueDate}
-                    </td>
-
-                    {/* Due Date */}
-                    <td className="py-3.5 px-3 text-slate-600 whitespace-nowrap">
-                      {inv.dueDate}
-                    </td>
-
-                    {/* Client */}
-                    <td className="py-3.5 px-3">
-                      <div>
-                        <p className="font-bold text-slate-900">{inv.clientName}</p>
-                        {inv.clientEmail && (
-                          <p className="text-[11px] text-slate-400">{inv.clientEmail}</p>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Total Amount */}
-                    <td className="py-3.5 px-3 text-right font-black text-slate-900 text-sm whitespace-nowrap">
-                      {formatPrice(inv.totalAmount)}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3.5 px-3 whitespace-nowrap">
-                      {inv.status === 'paid' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-0.5 text-[11px] font-bold border border-emerald-200">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                          <span>{t.invoiceStatusPaid}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-900 px-2.5 py-0.5 text-[11px] font-bold border border-blue-200">
-                          <Clock className="h-3 w-3 text-blue-600" />
-                          <span>{t.invoiceStatusSent}</span>
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td
-                      className="py-3.5 px-4 text-right whitespace-nowrap"
-                      onClick={(e) => e.stopPropagation()}
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-slate-50/80 transition cursor-pointer"
+                      onClick={() => onOpenInvoicePdf(inv)}
                     >
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => onOpenInvoicePdf(inv)}
-                          className="flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 transition cursor-pointer"
-                          title="Bekijk & Download PDF"
-                        >
-                          <Download className="h-3.5 w-3.5 text-slate-600" />
-                          <span>PDF</span>
-                        </button>
+                      {/* Invoice Number */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={
+                                inv.isCreditNote
+                                  ? 'text-rose-700 hover:underline'
+                                  : 'text-blue-600 hover:underline'
+                              }
+                            >
+                              {inv.invoiceNumber}
+                            </span>
+                            {inv.isCreditNote && (
+                              <span className="rounded-md bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.2 text-[9px] font-sans font-extrabold uppercase tracking-wider">
+                                {language === 'nl' ? 'Creditnota' : 'Credit Note'}
+                              </span>
+                            )}
+                          </div>
+                          {inv.isCreditNote && inv.originalInvoiceNumber && (
+                            <span className="text-[10px] font-sans font-medium text-slate-500">
+                              {language === 'nl' ? 'Ref. factuur:' : 'Ref. invoice:'}{' '}
+                              <strong className="font-mono text-slate-700">
+                                {inv.originalInvoiceNumber}
+                              </strong>
+                            </span>
+                          )}
+                          {!inv.isCreditNote && creditNoteNum && (
+                            <span className="text-[10px] font-sans font-medium text-rose-600">
+                              {language === 'nl' ? 'Gecrediteerd:' : 'Credited:'}{' '}
+                              <strong className="font-mono">{creditNoteNum}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                        {inv.status !== 'paid' && (
-                          <button
-                            onClick={() => markInvoicePaid(inv.id)}
-                            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 text-[11px] font-bold text-white transition cursor-pointer shadow-2xs"
-                            title={t.markAsPaid}
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
+                      {/* Issue Date */}
+                      <td className="py-3.5 px-3 text-slate-600 font-medium whitespace-nowrap">
+                        {inv.issueDate}
+                      </td>
+
+                      {/* Due Date */}
+                      <td className="py-3.5 px-3 text-slate-600 whitespace-nowrap">
+                        {inv.dueDate}
+                      </td>
+
+                      {/* Client */}
+                      <td className="py-3.5 px-3">
+                        <div>
+                          <p className="font-bold text-slate-900">{inv.clientName}</p>
+                          {inv.clientEmail && (
+                            <p className="text-[11px] text-slate-400">{inv.clientEmail}</p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Total Amount */}
+                      <td
+                        className={`py-3.5 px-3 text-right font-black text-sm whitespace-nowrap ${
+                          inv.isCreditNote ? 'text-rose-700' : 'text-slate-900'
+                        }`}
+                      >
+                        {formatPrice(inv.totalAmount)}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        {inv.status === 'paid' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-0.5 text-[11px] font-bold border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                            <span>{t.invoiceStatusPaid}</span>
+                          </span>
+                        ) : inv.isCreditNote ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2.5 py-0.5 text-[11px] font-bold border border-amber-200">
+                            <Clock className="h-3 w-3 text-amber-600" />
+                            <span>
+                              {language === 'nl' ? 'Te betalen (Credit)' : 'To be Paid (Credit)'}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-900 px-2.5 py-0.5 text-[11px] font-bold border border-blue-200">
+                            <Clock className="h-3 w-3 text-blue-600" />
+                            <span>{t.invoiceStatusSent}</span>
+                          </span>
                         )}
+                      </td>
 
-                        <button
-                          onClick={() => {
-                            if (window.confirm(language === 'nl' ? 'Factuur verwijderen uit administratie?' : 'Delete invoice?')) {
-                              deleteInvoice(inv.id);
-                            }
-                          }}
-                          className="rounded-xl p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                          title="Verwijder"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      {/* Actions */}
+                      <td
+                        className="py-3.5 px-4 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => onOpenInvoicePdf(inv)}
+                            className="flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 transition cursor-pointer"
+                            title="Bekijk & Download PDF"
+                          >
+                            <Download className="h-3.5 w-3.5 text-slate-600" />
+                            <span>PDF</span>
+                          </button>
+
+                          {!inv.isCreditNote && !creditNoteNum && (
+                            <button
+                              onClick={() => {
+                                const createdCn = createCreditNote(inv.id);
+                                if (createdCn) {
+                                  onOpenInvoicePdf(createdCn);
+                                }
+                              }}
+                              className="flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 transition cursor-pointer"
+                              title={
+                                language === 'nl'
+                                  ? 'Maak automatisch een creditnota om deze factuur tegen te boeken'
+                                  : 'Automatically create a credit note to reverse this invoice'
+                              }
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              <span>{language === 'nl' ? 'Creditnota' : 'Credit Note'}</span>
+                            </button>
+                          )}
+
+                          {inv.status !== 'paid' && (
+                            <button
+                              onClick={() => markInvoicePaid(inv.id)}
+                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 text-[11px] font-bold text-white transition cursor-pointer shadow-2xs"
+                              title={t.markAsPaid}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  language === 'nl'
+                                    ? 'Document verwijderen uit administratie?'
+                                    : 'Delete document?'
+                                )
+                              ) {
+                                deleteInvoice(inv.id);
+                              }
+                            }}
+                            className="rounded-xl p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            title="Verwijder"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -344,14 +344,6 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>{t.exportCSV}</span>
           </button>
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
-            title={t.printOverview}
-          >
-            <Printer className="h-3.5 w-3.5 text-slate-500" />
-            <span>{t.printOverview}</span>
-          </button>
         </div>
       </div>
 
@@ -819,9 +811,40 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                                 </span>
                               </div>
                             ) : (
-                              <span className="font-black text-slate-900 text-sm">
-                                {formatPrice(item.amount)}
-                              </span>
+                              <div className="flex flex-col items-end">
+                                <span className="font-black text-slate-900 text-sm">
+                                  {formatPrice(item.amount)}
+                                </span>
+                                <span className="text-[10px] font-medium text-slate-500">
+                                  {!(invoiceSettings.taxId && invoiceSettings.taxId.trim()) ||
+                                  invoiceSettings.isVatExempt
+                                    ? language === 'nl'
+                                      ? 'vrijgesteld van BTW'
+                                      : 'VAT exempt'
+                                    : (invoiceSettings.defaultVatRate ?? 21) === 0
+                                    ? language === 'nl'
+                                      ? '0% BTW'
+                                      : '0% VAT'
+                                    : (item.isVatInclusive ?? true)
+                                    ? language === 'nl'
+                                      ? 'incl. BTW'
+                                      : 'incl. VAT'
+                                    : language === 'nl'
+                                    ? 'excl. BTW'
+                                    : 'excl. VAT'}
+                                  {Boolean(invoiceSettings.taxId && invoiceSettings.taxId.trim()) &&
+                                    !(item.isVatInclusive ?? true) &&
+                                    !invoiceSettings.isVatExempt &&
+                                    (invoiceSettings.defaultVatRate ?? 21) > 0 &&
+                                    ` (${formatPrice(
+                                      Math.round(
+                                        item.amount *
+                                          (1 + (invoiceSettings.defaultVatRate ?? 21) / 100) *
+                                          100
+                                      ) / 100
+                                    )} incl.)`}
+                                </span>
+                              </div>
                             )}
                           </td>
 

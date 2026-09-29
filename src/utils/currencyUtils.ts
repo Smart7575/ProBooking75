@@ -53,13 +53,15 @@ export function getCurrencySymbol(currency?: string): string {
 
 export function formatCurrency(amount: number | undefined | null, currency?: string): string {
   const safeAmount = Number(amount || 0);
+  const sign = safeAmount < 0 ? '-' : '';
+  const absFormatted = Math.abs(safeAmount).toFixed(2);
   const code = sanitizeCurrencyCode(currency) || 'EUR';
 
   if (code === 'EUR') {
-    return `€${safeAmount.toFixed(2)}`;
+    return `${sign}€${absFormatted}`;
   }
   if (code === 'USD') {
-    return `$${safeAmount.toFixed(2)}`;
+    return `${sign}$${absFormatted}`;
   }
-  return `${code} ${safeAmount.toFixed(2)}`;
+  return `${sign}${code} ${absFormatted}`;
 }

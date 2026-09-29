@@ -79,6 +79,8 @@ export const ClientPortal: React.FC = () => {
     getUnreadCountForClient,
     magicLinkNotification,
     dismissMagicLinkNotification,
+    isTrainerPreview,
+    exitTrainerPreview,
     t,
     language,
   } = useBooking();
@@ -368,7 +370,10 @@ export const ClientPortal: React.FC = () => {
   // Generate private magic link details
   const magicLinkDetails = useMemo(() => {
     if (!currentClient) return null;
-    return getMagicLinkDetails(currentClient.magicToken);
+    return getMagicLinkDetails(
+      currentClient.magicToken,
+      (currentClient as any).trainerId || (currentClient as any).userId
+    );
   }, [currentClient]);
 
   const magicLinkUrl = magicLinkDetails ? magicLinkDetails.publicSharedUrl : '';
@@ -390,6 +395,39 @@ export const ClientPortal: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      {/* Trainer Test Mode Bar (ONLY visible to authenticated trainer testing as client; hidden for real clients) */}
+      {isTrainerPreview && (
+        <div className="rounded-2xl border border-emerald-500/40 bg-slate-900 text-white px-4 py-3 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-white block">
+                {language === 'nl'
+                  ? `Testmodus Klantportaal: ${currentClient.name}`
+                  : `Client Portal Test Mode: ${currentClient.name}`}
+              </span>
+              <span className="text-slate-400 text-[11px]">
+                {language === 'nl'
+                  ? 'Je bekijkt dit portaal als trainer. Echte klanten zien deze balk niet.'
+                  : 'You are previewing this portal as trainer. Real clients do not see this bar.'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={exitTrainerPreview}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-3.5 py-2 text-xs font-bold text-slate-950 shadow-sm transition shrink-0 cursor-pointer"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>
+              {language === 'nl' ? 'Terug naar Trainer Dashboard' : 'Back to Trainer Dashboard'}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Cancellation Feedback Banner (Confirms slot freed up) */}
       {cancelSuccessNotification && (
         <div id="cancel-success-alert" className="rounded-2xl border border-emerald-500/40 bg-emerald-950/90 text-white p-4 shadow-lg flex items-center justify-between gap-3 animate-fade-in">
@@ -1626,23 +1664,6 @@ export const ClientPortal: React.FC = () => {
                 )}
               </button>
             </div>
-
-            {magicLinkDetails?.isDevContainer && (
-              <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
-                <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <span className="font-bold text-amber-950 block">
-                    Belangrijk bij extern testen (403-fout voorkomen):
-                  </span>
-                  <p className="leading-relaxed">
-                    De ontwikkelomgeving (<code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[10px]">ais-dev-...</code>) is privé beveiligd door Google Cloud en geeft een <strong>403 Forbidden</strong> foutmelding als je deze opent in een incognito tabblad of op een mobiele telefoon.
-                  </p>
-                  <p className="leading-relaxed font-medium text-amber-950">
-                    👉 Klik rechtsboven in AI Studio op <strong>'Share' (Delen)</strong> om de app openbaar te maken. De link hierboven gebruikt automatisch de publieke deel-URL (<code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[10px]">ais-pre-...</code>) zodra deze gedeeld is!
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Contact Details Form */}
@@ -1680,11 +1701,10 @@ export const ClientPortal: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {t.clientEmail} *
+                    {t.clientEmail}
                   </label>
                   <input
                     type="email"
-                    required
                     value={profileForm.email}
                     onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
@@ -1695,11 +1715,10 @@ export const ClientPortal: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {t.clientPhone} *
+                    {t.clientPhone}
                   </label>
                   <input
                     type="tel"
-                    required
                     value={profileForm.phone}
                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                     className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"

@@ -44,6 +44,7 @@ export const initialSettings: ProviderSettings = {
   email: 'mark@jansen-performance.nl',
   phone: '+31 6 12345678',
   standardHourlyRate: 65,
+  ratesIncludeVat: true,
   currency: 'EUR',
   standardSlotDuration: 60,
   bufferMinutes: 15,
@@ -477,9 +478,12 @@ export const initialInvoiceSettings: InvoiceSettings = {
   bankName: 'ABN AMRO Bank N.V.',
   paymentTermDays: 14,
   defaultVatRate: 21,
+  vatRates: [0, 9, 21],
   numberPrefix: 'FACT-{YYYY}-',
   numberPadding: 4,
   nextSequenceNumber: 3,
+  creditNotePrefix: 'CN-{YYYY}-',
+  nextCreditNoteSequenceNumber: 1,
   invoiceNotes: 'Gelieve het factuurnummer te vermelden bij de betaling. Hartelijk dank voor het vertrouwen in Jansen Performance Coaching!',
 };
 

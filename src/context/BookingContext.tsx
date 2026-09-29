@@ -8,6 +8,8 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
 } from 'firebase/auth';
 import { auth, db, formatFirestoreError, OperationType } from '../firebase';
 import {
@@ -54,7 +56,7 @@ import {
 } from '../utils/dateUtils';
 import { translations } from '../utils/translations';
 import { SupportedCurrency, getCurrencySymbol, formatCurrency, sanitizeCurrencyCode } from '../utils/currencyUtils';
-import { formatInvoiceNumber } from '../utils/invoiceUtils';
+import { formatInvoiceNumber, isDemoTrainerName } from '../utils/invoiceUtils';
 import { getUrlMagicLinkParams, clearUrlMagicLinkParams } from '../utils/urlUtils';
 
 interface BookingContextType {
@@ -81,10 +83,12 @@ interface BookingContextType {
   updateInvoiceSettings: (settings: Partial<InvoiceSettings>) => void;
   invoices: Invoice[];
   createInvoice: (data: Omit<Invoice, 'id' | 'createdAt'>) => Invoice;
+  createCreditNote: (originalInvoiceId: string) => Invoice | null;
   updateInvoice: (invoiceId: string, updates: Partial<Invoice>) => void;
   markInvoicePaid: (invoiceId: string) => void;
   deleteInvoice: (invoiceId: string) => void;
   getNextInvoiceNumber: () => string;
+  getNextCreditNoteNumber: () => string;
 
   
   clients: Client[];
@@ -259,6 +263,8 @@ interface BookingContextType {
   magicLinkNotification: { clientName: string; token: string } | null;
   dismissMagicLinkNotification: () => void;
   simulateMagicLink: (token: string) => boolean;
+  isTrainerPreview: boolean;
+  exitTrainerPreview: () => void;
 
   // Firebase Cloud Sync state
   firebaseSyncStatus: 'connecting' | 'synced' | 'error';
@@ -275,7 +281,8 @@ const BookingContext = createContext<BookingContextType | undefined>(undefined);
 const LOCAL_STORAGE_KEY = 'probooking_app_state_v1';
 
 export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const currentUser = auth.currentUser;
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(() => auth.currentUser);
+  const currentUser = authUser || auth.currentUser;
   const initialMagicLinkParams = getUrlMagicLinkParams();
   const [resolvedTrainerUid, setResolvedTrainerUid] = useState<string | null>(
     () => currentUser?.uid || initialMagicLinkParams.trainerId || null
@@ -283,6 +290,18 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const resolvedTrainerUidRef = useRef<string | null>(
     currentUser?.uid || initialMagicLinkParams.trainerId || null
   );
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setAuthUser(u);
+      if (u?.uid) {
+        resolvedTrainerUidRef.current = u.uid;
+        setResolvedTrainerUid(u.uid);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const effectiveUid = currentUser?.uid || resolvedTrainerUid;
   const userStoragePrefix = effectiveUid
     ? `${LOCAL_STORAGE_KEY}_${effectiveUid}`
@@ -294,12 +313,38 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     initialMagicLinkParams.token ? 'client' : 'provider'
   );
   const isMagicLinkModeRef = useRef<boolean>(Boolean(initialMagicLinkParams.token));
+  const [isTrainerPreview, setIsTrainerPreview] = useState<boolean>(false);
+  const isTrainerPreviewRef = useRef<boolean>(false);
   const [activeClientId, setActiveClientId] = useState<string>('cli-1');
   const [magicLinkNotification, setMagicLinkNotification] = useState<{ clientName: string; token: string } | null>(null);
 
+  const exitTrainerPreview = useCallback(() => {
+    clearUrlMagicLinkParams();
+    setMagicLinkNotification(null);
+    isMagicLinkModeRef.current = false;
+    isTrainerPreviewRef.current = false;
+    setIsTrainerPreview(false);
+    setRoleState('provider');
+  }, []);
+
   const setRole = useCallback(
     (newRole: UserRole) => {
+      if (newRole === 'client') {
+        if (auth.currentUser && !getUrlMagicLinkParams().token) {
+          isTrainerPreviewRef.current = true;
+          setIsTrainerPreview(true);
+        }
+        setRoleState('client');
+        return;
+      }
+
       if (newRole === 'provider') {
+        // If the trainer was previewing/testing a client from their own authenticated session, return directly to Trainer Dashboard
+        if (auth.currentUser && isTrainerPreviewRef.current) {
+          exitTrainerPreview();
+          return;
+        }
+
         const hasMagicTokenInUrl = Boolean(getUrlMagicLinkParams().token);
         const isLeavingClientOrMagicLink =
           role === 'client' ||
@@ -310,6 +355,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         clearUrlMagicLinkParams();
         setMagicLinkNotification(null);
         isMagicLinkModeRef.current = false;
+        isTrainerPreviewRef.current = false;
+        setIsTrainerPreview(false);
         setRoleState('provider');
 
         if (!auth.currentUser || isLeavingClientOrMagicLink) {
@@ -324,7 +371,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
       setRoleState(newRole);
     },
-    [role, magicLinkNotification]
+    [role, magicLinkNotification, exitTrainerPreview]
   );
   const [language, setLanguageState] = useState<AppLanguage>(() => {
     try {
@@ -356,9 +403,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const forceSyncToFirebase = useCallback(() => {
     prevSubcollectionsRef.current = {};
+    isHydratedFromFirestoreRef.current = true;
+    setIsHydratedFromFirestore(true);
     setFirebaseSyncStatus('connecting');
     setFirebaseSyncError(null);
-    setReloadTrigger((n) => n + 1);
+    setSyncTrigger((n) => n + 1);
   }, []);
 
   const getPendingRegistration = () => {
@@ -406,15 +455,16 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const resolvedName =
-          parsed.name === 'Alex Jansen' && currentUser?.email !== 'alex@probooking.nl'
-            ? fallbackUserName
-            : parsed.name || fallbackUserName;
+        const resolvedName = isDemoTrainerName(parsed.name, currentUser?.email)
+          ? fallbackUserName
+          : parsed.name || fallbackUserName;
+        const isDemoEmail =
+          parsed.email === 'mark@jansen-performance.nl' || parsed.email === 'alex@probooking.nl';
         return {
           ...initialSettings,
           ...parsed,
           name: resolvedName,
-          email: parsed.email || fallbackUserEmail,
+          email: (!isDemoEmail && parsed.email) || fallbackUserEmail,
           availabilityMode: 'adhoc',
           adHocSchedule: Array.isArray(parsed.adHocSchedule)
             ? parsed.adHocSchedule
@@ -472,12 +522,43 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       const tName = pendingReg.name || fallbackUserName;
       return {
         ...initialInvoiceSettings,
-        businessName: `${tName} Coaching`,
+        businessName: tName,
         email: pendingReg.email || fallbackUserEmail,
         phone: pendingReg.phone || initialInvoiceSettings.phone,
+        website: '',
       };
     }
-    return saved ? JSON.parse(saved) : initialInvoiceSettings;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as InvoiceSettings;
+        const resolvedBizName = isDemoTrainerName(parsed.businessName, currentUser?.email)
+          ? settings.name || fallbackUserName
+          : parsed.businessName || settings.name || fallbackUserName;
+        const isDemoEmail =
+          parsed.email === 'mark@jansen-performance.nl' || parsed.email === 'alex@probooking.nl';
+        return {
+          ...initialInvoiceSettings,
+          ...parsed,
+          businessName: resolvedBizName,
+          email: (!isDemoEmail && parsed.email) || settings.email || fallbackUserEmail,
+          phone: parsed.phone || settings.phone,
+          website:
+            parsed.website === 'www.jansen-performance.nl' &&
+            currentUser?.email !== 'mark@jansen-performance.nl'
+              ? ''
+              : parsed.website,
+        };
+      } catch {
+        // fallback below
+      }
+    }
+    return {
+      ...initialInvoiceSettings,
+      businessName: settings.name || fallbackUserName,
+      email: settings.email || fallbackUserEmail,
+      phone: settings.phone || initialInvoiceSettings.phone,
+      website: '',
+    };
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
@@ -594,8 +675,19 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         resolvedTrainerUidRef.current = targetUid;
         setResolvedTrainerUid(targetUid);
 
+        const userDocRef = doc(db, 'users', targetUid);
         const trainerDocRef = doc(db, 'trainers', targetUid);
-        const snap = await getDoc(trainerDocRef);
+        let snap = await getDoc(userDocRef);
+        if (!snap.exists()) {
+          try {
+            const fallbackSnap = await getDoc(trainerDocRef);
+            if (fallbackSnap.exists()) {
+              snap = fallbackSnap;
+            }
+          } catch {
+            // Ignore if trainers collection is restricted
+          }
+        }
 
         if (isCancelled) return;
 
@@ -603,14 +695,14 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           const data = snap.data();
           const cloudSettings = data.settings || {};
           const isDemoFallbackInCloud =
-            (cloudSettings.name === 'Alex Jansen' || data.name === 'Alex Jansen') &&
-            auth.currentUser?.email !== 'alex@probooking.nl';
+            isDemoTrainerName(cloudSettings.name || data.name, auth.currentUser?.email);
 
           const resolvedName =
             pendingReg?.name ||
             (!isDemoFallbackInCloud && (cloudSettings.name || data.name)) ||
             auth.currentUser?.displayName ||
-            settings.name;
+            (!isDemoTrainerName(settings.name, auth.currentUser?.email) ? settings.name : '') ||
+            (auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : settings.name);
 
           const resolvedProfession =
             pendingReg?.profession ||
@@ -656,7 +748,43 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               : settings.services,
           };
 
-          const loadedClients: Client[] = Array.isArray(data.clients) ? data.clients : clients;
+          const cloudClients: Client[] = Array.isArray(data.clients) ? data.clients : [];
+          let subcollectionClients: Client[] = [];
+          try {
+            const subSnap = await getDocs(collection(db, 'users', targetUid, 'clients'));
+            subSnap.forEach((d) => {
+              const cData = d.data() as Client;
+              if (cData && cData.id) {
+                subcollectionClients.push(cData);
+              }
+            });
+          } catch {
+            // Ignore subcollection read errors
+          }
+
+          // Merge cloud clients, subcollection clients, and any custom local clients created before sync succeeded
+          const mergedClientsMap = new Map<string, Client>();
+          for (const c of cloudClients) {
+            if (c && c.id) mergedClientsMap.set(c.id, c);
+          }
+          for (const c of subcollectionClients) {
+            if (c && c.id) mergedClientsMap.set(c.id, c);
+          }
+          const demoClientIds = new Set(initialClients.map((ic) => ic.id));
+          for (const localC of clients) {
+            if (localC && localC.id && !mergedClientsMap.has(localC.id)) {
+              if (!demoClientIds.has(localC.id) || !Array.isArray(data.clients)) {
+                mergedClientsMap.set(localC.id, localC);
+              }
+            }
+          }
+
+          const loadedClients: Client[] =
+            mergedClientsMap.size > 0
+              ? Array.from(mergedClientsMap.values())
+              : Array.isArray(data.clients)
+              ? data.clients
+              : clients;
           const loadedAppointments: Appointment[] = Array.isArray(data.appointments) ? data.appointments : appointments;
           const loadedPackages: ServicePackage[] = Array.isArray(data.packages) ? data.packages : packages;
           const loadedClientPackages: ClientPackage[] = Array.isArray(data.clientPackages) ? data.clientPackages : clientPackages;
@@ -694,21 +822,41 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setPackages(loadedPackages);
           setClientPackages(loadedClientPackages);
           setMessages(loadedMessages);
-          if (data.invoiceSettings) {
-            setInvoiceSettings((prev) => ({
-              ...prev,
-              ...data.invoiceSettings,
-              businessName:
-                pendingReg?.name
-                  ? `${pendingReg.name} Coaching`
-                  : data.invoiceSettings.businessName === 'Jansen Performance Coaching' &&
-                    auth.currentUser?.email !== 'alex@probooking.nl'
-                  ? `${resolvedName} Coaching`
-                  : data.invoiceSettings.businessName,
-              email: resolvedEmail,
-            }));
-          }
-          setInvoices(loadedInvoices);
+
+          const cloudInvSettings = data.invoiceSettings || {};
+          const resolvedBizName =
+            pendingReg?.name ||
+            (!isDemoTrainerName(cloudInvSettings.businessName, auth.currentUser?.email)
+              ? cloudInvSettings.businessName
+              : resolvedName);
+          const resolvedWebsite =
+            cloudInvSettings.website === 'www.jansen-performance.nl' &&
+            auth.currentUser?.email !== 'mark@jansen-performance.nl'
+              ? ''
+              : cloudInvSettings.website ?? invoiceSettings.website ?? '';
+
+          setInvoiceSettings((prev) => ({
+            ...prev,
+            ...cloudInvSettings,
+            businessName: resolvedBizName,
+            email: resolvedEmail,
+            phone: cloudInvSettings.phone || resolvedPhone,
+            website: resolvedWebsite,
+          }));
+
+          const sanitizedInvoices = loadedInvoices.map((inv) => {
+            if (isDemoTrainerName(inv.senderBusinessName, auth.currentUser?.email)) {
+              return {
+                ...inv,
+                senderBusinessName: resolvedBizName,
+                senderEmail: resolvedEmail,
+                senderPhone: cloudInvSettings.phone || resolvedPhone,
+                senderWebsite: resolvedWebsite,
+              };
+            }
+            return inv;
+          });
+          setInvoices(sanitizedInvoices);
 
           isHydratedFromFirestoreRef.current = true;
           isFirestoreWritableRef.current = true;
@@ -717,7 +865,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setFirebaseSyncStatus('synced');
           setFirebaseSyncError(null);
         } else if (authUid) {
-          // Initialize new trainer document in Firestore
+          // Initialize new trainer document in Firestore under users/{uid}
           const trainerName =
             pendingReg?.name ||
             auth.currentUser?.displayName ||
@@ -758,9 +906,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setSettings(initialTrainerSettings);
           setInvoiceSettings(initialTrainerInvoiceSettings);
 
-          await setDoc(
-            trainerDocRef,
-            {
+          const initialTrainerPayload = JSON.parse(
+            JSON.stringify({
               uid: authUid,
               name: initialTrainerSettings.name,
               profession: initialTrainerSettings.profession,
@@ -777,9 +924,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               invoices,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
-            },
-            { merge: true }
+            })
           );
+
+          await setDoc(userDocRef, initialTrainerPayload, { merge: true });
+          setDoc(trainerDocRef, initialTrainerPayload, { merge: true }).catch(() => {});
 
           if (!isCancelled) {
             isHydratedFromFirestoreRef.current = true;
@@ -791,7 +940,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           }
         }
       } catch (err) {
-        const errInfo = formatFirestoreError(err, OperationType.GET, `trainers/${targetUid || 'unknown'}`);
+        const errInfo = formatFirestoreError(err, OperationType.GET, `users/${targetUid || 'unknown'}`);
         if (!isCancelled) {
           isHydratedFromFirestoreRef.current = true;
           isFirestoreWritableRef.current = false;
@@ -852,16 +1001,15 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Persist changes to Firebase Firestore whenever trainer/client state updates
   useEffect(() => {
-    const uid = auth.currentUser?.uid || resolvedTrainerUidRef.current;
-    if (!uid || !isHydratedFromFirestoreRef.current || !isFirestoreWritableRef.current || isAccountDeletingRef.current) return;
+    const uid = auth.currentUser?.uid || currentUser?.uid || resolvedTrainerUidRef.current;
+    if (!uid || !isHydratedFromFirestoreRef.current || isAccountDeletingRef.current) return;
 
     const timer = setTimeout(async () => {
       if (isAccountDeletingRef.current) return;
       try {
         const nowIso = new Date().toISOString();
-        await setDoc(
-          doc(db, 'trainers', uid),
-          {
+        const trainerDocPayload = JSON.parse(
+          JSON.stringify({
             uid,
             name: settings.name,
             profession: settings.profession,
@@ -877,11 +1025,16 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             invoiceSettings,
             invoices,
             updatedAt: nowIso,
-          },
-          { merge: true }
+          })
         );
 
-        // Synchronize each entity collection into its own Firestore subcollection (Create, Update, Delete)
+        await setDoc(doc(db, 'users', uid), trainerDocPayload, { merge: true });
+        setDoc(doc(db, 'trainers', uid), trainerDocPayload, { merge: true }).catch(() => {});
+        isFirestoreWritableRef.current = true;
+        setFirebaseSyncStatus('synced');
+        setFirebaseSyncError(null);
+
+        // Synchronize each entity collection into its own Firestore subcollection under users/{uid}/{subcollectionName}
         const syncSubcollection = async <T extends { id: string }>(
           subcollectionName: string,
           items: T[],
@@ -896,23 +1049,31 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             const serialized = JSON.stringify(item);
             nextMap.set(item.id, serialized);
             if (prevMap.get(item.id) !== serialized) {
-              const payload = {
-                ...item,
-                trainerId: uid,
-                trainerName: settings.name,
-                trainerEmail: settings.email,
-                updatedAt: nowIso,
-              };
+              const payload = JSON.parse(
+                JSON.stringify({
+                  ...item,
+                  userId: uid,
+                  trainerId: uid,
+                  trainerName: settings.name,
+                  trainerEmail: settings.email,
+                  updatedAt: nowIso,
+                })
+              );
+              ops.push(
+                setDoc(doc(db, 'users', uid, subcollectionName, item.id), payload, {
+                  merge: true,
+                })
+              );
               ops.push(
                 setDoc(doc(db, 'trainers', uid, subcollectionName, item.id), payload, {
                   merge: true,
-                })
+                }).catch(() => {})
               );
               if (mirrorTopLevelCollection) {
                 ops.push(
                   setDoc(doc(db, mirrorTopLevelCollection, `${uid}_${item.id}`), payload, {
                     merge: true,
-                  })
+                  }).catch(() => {})
                 );
               }
             }
@@ -921,9 +1082,16 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           // Delete removed items from Firestore subcollection
           for (const oldId of prevMap.keys()) {
             if (!nextMap.has(oldId)) {
-              ops.push(deleteDoc(doc(db, 'trainers', uid, subcollectionName, oldId)));
+              ops.push(
+                deleteDoc(doc(db, 'users', uid, subcollectionName, oldId)).catch(() => {})
+              );
+              ops.push(
+                deleteDoc(doc(db, 'trainers', uid, subcollectionName, oldId)).catch(() => {})
+              );
               if (mirrorTopLevelCollection) {
-                ops.push(deleteDoc(doc(db, mirrorTopLevelCollection, `${uid}_${oldId}`)));
+                ops.push(
+                  deleteDoc(doc(db, mirrorTopLevelCollection, `${uid}_${oldId}`)).catch(() => {})
+                );
               }
             }
           }
@@ -945,19 +1113,17 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           syncSubcollection('messages', messages, 'messages'),
           syncSubcollection('invoices', invoices, 'invoices'),
         ]);
-
-        setFirebaseSyncStatus('synced');
-        setFirebaseSyncError(null);
       } catch (err) {
-        const errInfo = formatFirestoreError(err, OperationType.WRITE, `trainers/${uid}`);
-        isFirestoreWritableRef.current = false;
+        const errInfo = formatFirestoreError(err, OperationType.WRITE, `users/${uid}`);
         setFirebaseSyncStatus('error');
         setFirebaseSyncError(errInfo.error);
       }
-    }, 250);
+    }, 150);
 
     return () => clearTimeout(timer);
   }, [
+    currentUser?.uid,
+    resolvedTrainerUid,
     isHydratedFromFirestore,
     syncTrigger,
     settings,
@@ -976,11 +1142,13 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setMagicLinkNotification(null);
   };
 
-  // Simulate opening a magic link directly inside the app
+  // Simulate opening a magic link directly inside the app (Trainer testing as Client)
   const simulateMagicLink = (token: string): boolean => {
     const found = clients.find((c) => c.magicToken === token);
     if (found) {
-      isMagicLinkModeRef.current = true;
+      isTrainerPreviewRef.current = true;
+      setIsTrainerPreview(true);
+      isMagicLinkModeRef.current = false;
       setActiveClientId(found.id);
       setSelectedChatClientId(found.id);
       setRoleState('client');
@@ -988,15 +1156,6 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         clientName: found.name,
         token: found.magicToken,
       });
-      // Optionally reflect in URL without reload
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('token', token);
-        window.history.replaceState({}, '', url.toString());
-        window.dispatchEvent(new CustomEvent('probooking:magic-link-changed'));
-      } catch {
-        // Ignore in restricted iframe
-      }
       return true;
     }
     return false;
@@ -1042,27 +1201,74 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Settings update
   const updateSettings = (newSettings: Partial<ProviderSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      // Also keep invoiceSettings in sync when trainer updates their name, email, or phone
+      if (newSettings.name || newSettings.email || newSettings.phone) {
+        setInvoiceSettings((prevInv) => {
+          const shouldSyncBusinessName =
+            newSettings.name &&
+            (isDemoTrainerName(prevInv.businessName, updated.email) ||
+              prevInv.businessName === prev.name ||
+              prevInv.businessName === `${prev.name} Coaching`);
+          const isDemoEmail =
+            prevInv.email === 'mark@jansen-performance.nl' ||
+            prevInv.email === 'alex@probooking.nl';
+          return {
+            ...prevInv,
+            businessName: shouldSyncBusinessName ? newSettings.name! : prevInv.businessName,
+            email:
+              newSettings.email && (isDemoEmail || prevInv.email === prev.email || !prevInv.email)
+                ? newSettings.email
+                : prevInv.email,
+            phone:
+              newSettings.phone && (prevInv.phone === prev.phone || !prevInv.phone)
+                ? newSettings.phone
+                : prevInv.phone,
+          };
+        });
+      }
+      return updated;
+    });
   };
 
   // Client Management
-  const syncClientToFirestore = async (client: Client) => {
-    const uid = auth.currentUser?.uid || resolvedTrainerUidRef.current;
+  const syncClientToFirestore = async (client: Client, nextClientsList?: Client[]) => {
+    const uid = auth.currentUser?.uid || currentUser?.uid || resolvedTrainerUidRef.current;
     if (!uid) return;
     try {
-      const payload = {
-        ...client,
-        trainerId: uid,
-        trainerName: settings.name,
-        trainerEmail: settings.email,
-        updatedAt: new Date().toISOString(),
-      };
-      await Promise.all([
-        setDoc(doc(db, 'trainers', uid, 'clients', client.id), payload, { merge: true }),
-        setDoc(doc(db, 'clients', `${uid}_${client.id}`), payload, { merge: true }),
-      ]);
+      const nowIso = new Date().toISOString();
+      const payload = JSON.parse(
+        JSON.stringify({
+          ...client,
+          userId: uid,
+          trainerId: uid,
+          trainerName: settings.name,
+          trainerEmail: settings.email,
+          updatedAt: nowIso,
+        })
+      );
+      await setDoc(doc(db, 'users', uid, 'clients', client.id), payload, { merge: true });
+      if (nextClientsList) {
+        const cleanClients = JSON.parse(JSON.stringify(nextClientsList));
+        await setDoc(
+          doc(db, 'users', uid),
+          {
+            uid,
+            clients: cleanClients,
+            updatedAt: nowIso,
+          },
+          { merge: true }
+        );
+      }
+      setDoc(doc(db, 'trainers', uid, 'clients', client.id), payload, { merge: true }).catch(() => {});
+      setDoc(doc(db, 'clients', `${uid}_${client.id}`), payload, { merge: true }).catch(() => {});
+      setFirebaseSyncStatus('synced');
+      setFirebaseSyncError(null);
     } catch (err) {
-      formatFirestoreError(err, OperationType.WRITE, `trainers/${uid}/clients/${client.id}`);
+      const errInfo = formatFirestoreError(err, OperationType.WRITE, `users/${uid}/clients/${client.id}`);
+      setFirebaseSyncStatus('error');
+      setFirebaseSyncError(errInfo.error);
     }
   };
 
@@ -1078,67 +1284,88 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       createdAt: formatDateISO(new Date()),
     };
 
-    setClients((prev) => [newClient, ...prev]);
-    syncClientToFirestore(newClient);
+    const nextClients = [newClient, ...clients];
+    setClients(nextClients);
+    syncClientToFirestore(newClient, nextClients);
 
     return newClient;
   };
 
   const updateClient = (id: string, clientData: Partial<Client>) => {
-    setClients((prev) =>
-      prev.map((c) => {
+    setClients((prev) => {
+      let updatedClient: Client | null = null;
+      const nextClients = prev.map((c) => {
         if (c.id === id) {
-          const updated = { ...c, ...clientData };
-          syncClientToFirestore(updated);
-          return updated;
+          updatedClient = { ...c, ...clientData };
+          return updatedClient;
         }
         return c;
-      })
-    );
+      });
+      if (updatedClient) {
+        syncClientToFirestore(updatedClient, nextClients);
+      }
+      return nextClients;
+    });
   };
 
   const updateClientContactDetails = (id: string, details: Partial<Client>) => {
-    setClients((prev) =>
-      prev.map((c) => {
+    setClients((prev) => {
+      let updatedClient: Client | null = null;
+      const nextClients = prev.map((c) => {
         if (c.id === id) {
-          const updated = { ...c, ...details };
-          syncClientToFirestore(updated);
-          return updated;
+          updatedClient = { ...c, ...details };
+          return updatedClient;
         }
         return c;
-      })
-    );
+      });
+      if (updatedClient) {
+        syncClientToFirestore(updatedClient, nextClients);
+      }
+      return nextClients;
+    });
   };
 
   const archiveClient = (id: string) => {
-    setClients((prev) =>
-      prev.map((c) => {
+    setClients((prev) => {
+      let updatedClient: Client | null = null;
+      const nextClients = prev.map((c) => {
         if (c.id === id) {
-          const updated = { ...c, isArchived: !c.isArchived };
-          syncClientToFirestore(updated);
-          return updated;
+          updatedClient = { ...c, isArchived: !c.isArchived };
+          return updatedClient;
         }
         return c;
-      })
-    );
+      });
+      if (updatedClient) {
+        syncClientToFirestore(updatedClient, nextClients);
+      }
+      return nextClients;
+    });
   };
 
   const deleteClient = (id: string) => {
     // Under GDPR FR-8: delete client and redact/remove their personal associations
-    setClients((prev) => prev.filter((c) => c.id !== id));
+    const nextClients = clients.filter((c) => c.id !== id);
+    setClients(nextClients);
     setAppointments((prev) => prev.filter((a) => a.clientId !== id));
     setClientPackages((prev) => prev.filter((cp) => cp.clientId !== id));
     setMessages((prev) => prev.filter((m) => m.clientId !== id));
     if (activeClientId === id && activeClients.length > 0) {
       setActiveClientId(activeClients[0].id);
     }
-    const uid = auth.currentUser?.uid;
+    const uid = auth.currentUser?.uid || currentUser?.uid || resolvedTrainerUidRef.current;
     if (uid) {
+      const cleanClients = JSON.parse(JSON.stringify(nextClients));
       Promise.all([
-        deleteDoc(doc(db, 'trainers', uid, 'clients', id)),
-        deleteDoc(doc(db, 'clients', `${uid}_${id}`)),
+        deleteDoc(doc(db, 'users', uid, 'clients', id)),
+        setDoc(
+          doc(db, 'users', uid),
+          { uid, clients: cleanClients, updatedAt: new Date().toISOString() },
+          { merge: true }
+        ),
+        deleteDoc(doc(db, 'trainers', uid, 'clients', id)).catch(() => {}),
+        deleteDoc(doc(db, 'clients', `${uid}_${id}`)).catch(() => {}),
       ]).catch((err) => {
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}/clients/${id}`);
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}/clients/${id}`);
       });
     }
   };
@@ -1208,9 +1435,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     }));
     const uid = auth.currentUser?.uid;
     if (uid) {
-      deleteDoc(doc(db, 'trainers', uid, 'exceptions', id)).catch((err) =>
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}/exceptions/${id}`)
+      deleteDoc(doc(db, 'users', uid, 'exceptions', id)).catch((err) =>
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}/exceptions/${id}`)
       );
+      deleteDoc(doc(db, 'trainers', uid, 'exceptions', id)).catch(() => {});
     }
   };
 
@@ -1409,9 +1637,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setClientPackages((prev) => prev.filter((cp) => cp.id !== clientPackageId));
     const uid = auth.currentUser?.uid;
     if (uid) {
-      deleteDoc(doc(db, 'trainers', uid, 'clientPackages', clientPackageId)).catch((err) =>
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}/clientPackages/${clientPackageId}`)
+      deleteDoc(doc(db, 'users', uid, 'clientPackages', clientPackageId)).catch((err) =>
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}/clientPackages/${clientPackageId}`)
       );
+      deleteDoc(doc(db, 'trainers', uid, 'clientPackages', clientPackageId)).catch(() => {});
     }
   };
 
@@ -2339,9 +2568,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setAppointments((prev) => prev.filter((a) => a.id !== appointmentId));
     const uid = auth.currentUser?.uid;
     if (uid) {
-      deleteDoc(doc(db, 'trainers', uid, 'appointments', appointmentId)).catch((err) =>
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}/appointments/${appointmentId}`)
+      deleteDoc(doc(db, 'users', uid, 'appointments', appointmentId)).catch((err) =>
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}/appointments/${appointmentId}`)
       );
+      deleteDoc(doc(db, 'trainers', uid, 'appointments', appointmentId)).catch(() => {});
     }
   };
 
@@ -2487,6 +2717,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           const service = settings.services.find((s) => s.id === appt.serviceId);
           const isCovered = !!appt.packageId;
 
+          const hasCustomRate = client?.customHourlyRate !== undefined && client?.customHourlyRate > 0;
+          const isVatInclusive = hasCustomRate
+            ? client?.customHourlyRateIncludesVat ?? (settings.ratesIncludeVat ?? true)
+            : settings.ratesIncludeVat ?? true;
+
           items.push({
             id: `appt-${appt.id}`,
             sourceId: appt.id,
@@ -2500,6 +2735,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               isCovered ? ` • ${appt.packageName || 'Package'}` : ''
             }${appt.completionNotes ? ` • ${appt.completionNotes}` : ''}`,
             amount: isCovered ? 0 : appt.price,
+            isVatInclusive,
             status: appt.billingStatus || 'to_invoice',
             invoicedAt: appt.invoicedAt,
             paidAt: appt.paidAt,
@@ -2528,6 +2764,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           title: cp.packageName,
           description: `${cp.totalSessions} sessions (${cp.remainingSessions} remaining)`,
           amount: cp.pricePaid,
+          isVatInclusive: settings.ratesIncludeVat ?? true,
           status: cp.billingStatus || 'to_invoice',
           invoicedAt: cp.invoicedAt,
           paidAt: cp.paidAt,
@@ -2537,7 +2774,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       return items.sort((a, b) => b.date.localeCompare(a.date));
     },
-    [appointments, clientPackages, clients, settings.services]
+    [appointments, clientPackages, clients, settings.services, settings.ratesIncludeVat]
   );
 
   const { unbilledItemsCount, totalUnbilledAmount } = useMemo(() => {
@@ -2626,9 +2863,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     const uid = auth.currentUser?.uid;
     if (uid) {
-      deleteDoc(doc(db, 'trainers', uid, 'messages', messageId)).catch((err) =>
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}/messages/${messageId}`)
+      deleteDoc(doc(db, 'users', uid, 'messages', messageId)).catch((err) =>
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}/messages/${messageId}`)
       );
+      deleteDoc(doc(db, 'trainers', uid, 'messages', messageId)).catch(() => {});
     }
   };
 
@@ -2665,7 +2903,45 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Invoicing & Administration
   const updateInvoiceSettings = (updates: Partial<InvoiceSettings>) => {
-    setInvoiceSettings((prev) => ({ ...prev, ...updates }));
+    setInvoiceSettings((prev) => {
+      const next = { ...prev, ...updates };
+      const hasTaxId = Boolean(next.taxId && next.taxId.trim().length > 0);
+      if (!hasTaxId) {
+        next.defaultVatRate = 0;
+        next.isVatExempt = true;
+      }
+      if (
+        updates.businessName !== undefined ||
+        updates.email !== undefined ||
+        updates.phone !== undefined ||
+        updates.address !== undefined ||
+        updates.postalCode !== undefined ||
+        updates.city !== undefined ||
+        updates.chamberOfCommerce !== undefined ||
+        updates.taxId !== undefined ||
+        updates.iban !== undefined
+      ) {
+        setInvoices((prevInvs) =>
+          prevInvs.map((inv) => ({
+            ...inv,
+            senderBusinessName: next.businessName || inv.senderBusinessName,
+            senderEmail: next.email || inv.senderEmail,
+            senderPhone: next.phone || inv.senderPhone,
+            senderAddress: next.address || inv.senderAddress,
+            senderPostalCode: next.postalCode || inv.senderPostalCode,
+            senderCity: next.city || inv.senderCity,
+            senderCountry: next.country || inv.senderCountry,
+            senderChamberOfCommerce: next.chamberOfCommerce ?? '',
+            senderTaxId: next.taxId ?? '',
+            senderIban: next.iban ?? inv.senderIban,
+            senderBic: next.bic ?? inv.senderBic,
+            senderBankName: next.bankName ?? inv.senderBankName,
+            senderWebsite: next.website ?? inv.senderWebsite,
+          }))
+        );
+      }
+      return next;
+    });
   };
 
   const getNextInvoiceNumber = (): string => {
@@ -2675,6 +2951,123 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       invoiceSettings.nextSequenceNumber,
       new Date()
     );
+  };
+
+  const getNextCreditNoteNumber = (): string => {
+    return formatInvoiceNumber(
+      invoiceSettings.creditNotePrefix || 'CN-{YYYY}-',
+      invoiceSettings.numberPadding || 4,
+      invoiceSettings.nextCreditNoteSequenceNumber || 1,
+      new Date()
+    );
+  };
+
+  const createCreditNote = (originalInvoiceId: string): Invoice | null => {
+    const originalInvoice = invoices.find((inv) => inv.id === originalInvoiceId);
+    if (!originalInvoice || originalInvoice.isCreditNote) return null;
+
+    const existingCn = invoices.find(
+      (inv) =>
+        inv.isCreditNote &&
+        (inv.originalInvoiceId === originalInvoice.id ||
+          inv.originalInvoiceNumber === originalInvoice.invoiceNumber)
+    );
+    if (existingCn) return existingCn;
+
+    const todayStr = formatDateISO(new Date());
+    const creditNoteNumber = getNextCreditNoteNumber();
+    const wasAlreadyPaid = originalInvoice.status === 'paid';
+
+    // If the original invoice was not yet paid, both original invoice and credit note become settled (paid).
+    // If the original invoice was already paid, the credit note must still be paid (status: 'sent').
+    const creditNoteStatus: InvoiceStatus = wasAlreadyPaid ? 'sent' : 'paid';
+    const creditNotePaidAt = wasAlreadyPaid ? undefined : todayStr;
+
+    const creditItems: InvoiceLineItem[] = (originalInvoice.items || []).map((item, idx) => ({
+      ...item,
+      id: `cn-line-${Date.now()}-${idx}`,
+      unitPrice: -Math.abs(Number(item.unitPrice) || 0),
+      baseAmount:
+        item.baseAmount !== undefined ? -Math.abs(Number(item.baseAmount) || 0) : undefined,
+      vatAmount: -Math.abs(Number(item.vatAmount) || 0),
+      total: -Math.abs(Number(item.total) || 0),
+    }));
+
+    const newCreditNote: Invoice = {
+      ...originalInvoice,
+      id: `cn-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      invoiceNumber: creditNoteNumber,
+      isCreditNote: true,
+      originalInvoiceId: originalInvoice.id,
+      originalInvoiceNumber: originalInvoice.invoiceNumber,
+      creditNoteId: undefined,
+      creditNoteNumber: undefined,
+      issueDate: todayStr,
+      dueDate: todayStr,
+      status: creditNoteStatus,
+      paidAt: creditNotePaidAt,
+      items: creditItems,
+      subtotal: -Math.abs(Number(originalInvoice.subtotal) || 0),
+      totalVat: -Math.abs(Number(originalInvoice.totalVat) || 0),
+      totalAmount: -Math.abs(Number(originalInvoice.totalAmount) || 0),
+      notes:
+        language === 'nl'
+          ? `Creditnota ter volledige tegenboeking van factuur ${originalInvoice.invoiceNumber}.`
+          : `Credit note reversing invoice ${originalInvoice.invoiceNumber} in full.`,
+      createdAt: new Date().toISOString(),
+    };
+
+    setInvoices((prev) => [
+      newCreditNote,
+      ...prev.map((inv) => {
+        if (inv.id === originalInvoice.id) {
+          return {
+            ...inv,
+            creditNoteId: newCreditNote.id,
+            creditNoteNumber: creditNoteNumber,
+            status: 'paid' as InvoiceStatus,
+            paidAt: inv.paidAt || todayStr,
+          };
+        }
+        return inv;
+      }),
+    ]);
+
+    setInvoiceSettings((prev) => ({
+      ...prev,
+      nextCreditNoteSequenceNumber: (prev.nextCreditNoteSequenceNumber || 1) + 1,
+    }));
+
+    if (!wasAlreadyPaid && originalInvoice.items && originalInvoice.items.length > 0) {
+      const apptSourceIds = new Set(
+        originalInvoice.items
+          .filter((i) => i.sourceType === 'appointment' && i.sourceId)
+          .map((i) => i.sourceId!)
+      );
+      const pkgSourceIds = new Set(
+        originalInvoice.items
+          .filter((i) => i.sourceType === 'package' && i.sourceId)
+          .map((i) => i.sourceId!)
+      );
+
+      if (apptSourceIds.size > 0) {
+        setAppointments((prev) =>
+          prev.map((a) =>
+            apptSourceIds.has(a.id) ? { ...a, billingStatus: 'paid', paidAt: todayStr } : a
+          )
+        );
+      }
+
+      if (pkgSourceIds.size > 0) {
+        setClientPackages((prev) =>
+          prev.map((cp) =>
+            pkgSourceIds.has(cp.id) ? { ...cp, billingStatus: 'paid', paidAt: todayStr } : cp
+          )
+        );
+      }
+    }
+
+    return newCreditNote;
   };
 
   const createInvoice = (data: Omit<Invoice, 'id' | 'createdAt'>): Invoice => {
@@ -2850,6 +3243,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     const cleanInvoiceSettings: InvoiceSettings = {
       ...invoiceSettings,
       nextSequenceNumber: 1,
+      nextCreditNoteSequenceNumber: 1,
     };
 
     const knownItemsByCollection: Record<string, Array<{ id: string }>> = {
@@ -2909,6 +3303,15 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         collectionNames.map(async (colName) => {
           const deletePromises: Promise<unknown>[] = [];
           try {
+            const userSubSnap = await getDocs(collection(db, 'users', uid, colName));
+            userSubSnap.forEach((docSnap) => {
+              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
+            });
+          } catch {
+            // fallback to known items
+          }
+
+          try {
             const subSnap = await getDocs(collection(db, 'trainers', uid, colName));
             subSnap.forEach((docSnap) => {
               deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
@@ -2921,6 +3324,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           for (const item of knownItems) {
             if (item?.id) {
               deletePromises.push(
+                deleteDoc(doc(db, 'users', uid, colName, item.id)).catch(() => {}),
                 deleteDoc(doc(db, 'trainers', uid, colName, item.id)).catch(() => {})
               );
             }
@@ -2950,29 +3354,28 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         })
       );
 
-      await setDoc(
-        doc(db, 'trainers', uid),
-        {
-          uid,
-          name: cleanSettings.name,
-          profession: cleanSettings.profession,
-          email: cleanSettings.email,
-          phone: cleanSettings.phone,
-          standardHourlyRate: cleanSettings.standardHourlyRate,
-          settings: cleanSettings,
-          invoiceSettings: cleanInvoiceSettings,
-          clients: [],
-          appointments: [],
-          packages: [],
-          clientPackages: [],
-          messages: [],
-          invoices: [],
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      const cleanPayload = {
+        uid,
+        name: cleanSettings.name,
+        profession: cleanSettings.profession,
+        email: cleanSettings.email,
+        phone: cleanSettings.phone,
+        standardHourlyRate: cleanSettings.standardHourlyRate,
+        settings: cleanSettings,
+        invoiceSettings: cleanInvoiceSettings,
+        clients: [],
+        appointments: [],
+        packages: [],
+        clientPackages: [],
+        messages: [],
+        invoices: [],
+        updatedAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, 'users', uid), cleanPayload, { merge: true });
+      setDoc(doc(db, 'trainers', uid), cleanPayload, { merge: true }).catch(() => {});
     } catch (err) {
-      formatFirestoreError(err, OperationType.WRITE, `trainers/${uid}`);
+      formatFirestoreError(err, OperationType.WRITE, `users/${uid}`);
     }
   };
 
@@ -3029,10 +3432,19 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     try {
-      // 3. Delete all subcollection documents under trainers/{uid}/{subcollection}
+      // 3. Delete all subcollection documents under users/{uid}/{subcollection} and trainers/{uid}/{subcollection}
       await Promise.all(
         collectionNames.map(async (colName) => {
           const deletePromises: Promise<unknown>[] = [];
+
+          try {
+            const userSubSnap = await getDocs(collection(db, 'users', uid, colName));
+            userSubSnap.forEach((docSnap) => {
+              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
+            });
+          } catch {
+            // Fallback to known state item IDs if listing subcollection fails
+          }
 
           try {
             const subSnap = await getDocs(collection(db, 'trainers', uid, colName));
@@ -3047,6 +3459,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           for (const item of knownItems) {
             if (item?.id) {
               deletePromises.push(
+                deleteDoc(doc(db, 'users', uid, colName, item.id)).catch(() => {}),
                 deleteDoc(doc(db, 'trainers', uid, colName, item.id)).catch(() => {})
               );
             }
@@ -3077,11 +3490,12 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         })
       );
 
-      // 5. Delete the root trainer document trainers/{uid}
+      // 5. Delete the root trainer document users/{uid} and trainers/{uid}
       try {
-        await deleteDoc(doc(db, 'trainers', uid));
+        await deleteDoc(doc(db, 'users', uid));
+        await deleteDoc(doc(db, 'trainers', uid)).catch(() => {});
       } catch (err) {
-        formatFirestoreError(err, OperationType.DELETE, `trainers/${uid}`);
+        formatFirestoreError(err, OperationType.DELETE, `users/${uid}`);
       }
 
       // 6. Clean up all localStorage keys associated with this user
@@ -3133,10 +3547,12 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateInvoiceSettings,
         invoices,
         createInvoice,
+        createCreditNote,
         updateInvoice,
         markInvoicePaid,
         deleteInvoice,
         getNextInvoiceNumber,
+        getNextCreditNoteNumber,
         clients,
         activeClients,
         addClient,
@@ -3211,6 +3627,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         magicLinkNotification,
         dismissMagicLinkNotification,
         simulateMagicLink,
+        isTrainerPreview,
+        exitTrainerPreview,
         firebaseSyncStatus,
         firebaseSyncError,
         forceSyncToFirebase,

@@ -67,33 +67,26 @@ export const clearUrlMagicLinkParams = (): void => {
   window.dispatchEvent(new CustomEvent('probooking:magic-link-changed'));
 };
 
-export const getMagicLinkDetails = (token: string, trainerId?: string): MagicLinkDetails => {
-  const currentOrigin = window.location.origin;
-  const isDevContainer = currentOrigin.includes('ais-dev-');
-  const pathname = window.location.pathname.endsWith('/')
-    ? window.location.pathname
-    : `${window.location.pathname}/`;
+export const PUBLIC_CLIENT_BASE_URL = 'https://pro-booking75.vercel.app/';
 
-  const resolvedTrainerId = trainerId || auth.currentUser?.uid || undefined;
+export const getMagicLinkDetails = (token: string, trainerId?: string): MagicLinkDetails => {
+  const urlParams = getUrlMagicLinkParams();
+  const resolvedTrainerId = trainerId || auth.currentUser?.uid || urlParams.trainerId || undefined;
   const querySuffix = `?token=${encodeURIComponent(token)}${
     resolvedTrainerId ? `&trainer=${encodeURIComponent(resolvedTrainerId)}` : ''
   }`;
 
-  const inAppUrl = `${currentOrigin}${pathname}${querySuffix}`;
+  const clientMagicUrl = `${PUBLIC_CLIENT_BASE_URL}${querySuffix}`;
+  const inAppUrl = clientMagicUrl;
+  const publicSharedUrl = clientMagicUrl;
 
-  const publicOrigin = isDevContainer
-    ? currentOrigin.replace('ais-dev-', 'ais-pre-')
-    : currentOrigin;
-  const publicSharedUrl = `${publicOrigin}${pathname}${querySuffix}`;
-
-  const explanation = isDevContainer
-    ? 'De ontwikkel-URL (ais-dev) is privé beveiligd door Google AI Studio. Buiten deze ontwikkelsessie (bv. in incognito of op mobiel) geeft Google Cloud Run een 403 error. Klik op "Share" in AI Studio voor publieke toegang, of test direct in deze preview.'
-    : 'Deze unieke link geeft direct toegang tot het self-service boekingsportaal zonder wachtwoord.';
+  const explanation =
+    'Deze unieke link verwijst altijd naar https://pro-booking75.vercel.app/ en geeft de klant direct toegang tot het persoonlijke boekingsportaal zonder wachtwoord.';
 
   return {
     token,
     trainerId: resolvedTrainerId,
-    isDevContainer,
+    isDevContainer: false,
     inAppUrl,
     publicSharedUrl,
     explanation,

@@ -144,13 +144,26 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
   const [isFixedScheduleModalOpen, setIsFixedScheduleModalOpen] = useState(false);
 
   // Local state for profile and rates
-  const [profileForm, setProfileForm] = useState({
+  const [profileForm, setProfileForm] = useState<{
+    name: string;
+    profession: string;
+    email: string;
+    phone: string;
+    currency: SupportedCurrency;
+    standardHourlyRate: number | string;
+    ratesIncludeVat: boolean;
+    standardSlotDuration: number;
+    bufferMinutes: number;
+    cancellationPolicyHours: number | string;
+    allowUnrestrictedCancellation: boolean;
+  }>({
     name: settings.name,
     profession: settings.profession,
     email: settings.email,
     phone: settings.phone,
     currency: (settings.currency || 'EUR') as SupportedCurrency,
     standardHourlyRate: settings.standardHourlyRate,
+    ratesIncludeVat: settings.ratesIncludeVat ?? true,
     standardSlotDuration: settings.standardSlotDuration,
     bufferMinutes: settings.bufferMinutes,
     cancellationPolicyHours: settings.cancellationPolicyHours,
@@ -166,6 +179,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
       phone: settings.phone,
       currency: (settings.currency || 'EUR') as SupportedCurrency,
       standardHourlyRate: settings.standardHourlyRate,
+      ratesIncludeVat: settings.ratesIncludeVat ?? true,
       standardSlotDuration: settings.standardSlotDuration,
       bufferMinutes: settings.bufferMinutes,
       cancellationPolicyHours: settings.cancellationPolicyHours,
@@ -195,7 +209,13 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
   // Service modal state
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceType | null>(null);
-  const [serviceForm, setServiceForm] = useState({
+  const [serviceForm, setServiceForm] = useState<{
+    name: string;
+    durationMinutes: number;
+    description: string;
+    basePrice: number | string;
+    color: string;
+  }>({
     name: '',
     durationMinutes: 60,
     description: '',
@@ -233,6 +253,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
       phone: profileForm.phone,
       currency: cleanedCurrency,
       standardHourlyRate: Number(profileForm.standardHourlyRate),
+      ratesIncludeVat: profileForm.ratesIncludeVat,
       standardSlotDuration: Number(profileForm.standardSlotDuration),
       bufferMinutes: Number(profileForm.bufferMinutes),
       cancellationPolicyHours: Number(profileForm.cancellationPolicyHours),
@@ -482,7 +503,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 type="number"
                 step="0.5"
                 value={profileForm.standardHourlyRate}
-                onChange={(e) => setProfileForm({ ...profileForm, standardHourlyRate: Number(e.target.value) })}
+                onChange={(e) => setProfileForm({ ...profileForm, standardHourlyRate: e.target.value })}
                 className={`w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition ${
                   getCurrencySymbol(profileForm.currency || 'EUR').length > 3
                     ? 'pl-14'
@@ -492,8 +513,52 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 }`}
               />
             </div>
+            <div className="flex items-center gap-3 mt-2">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={profileForm.ratesIncludeVat === false}
+                  onChange={() => {
+                    setProfileForm({ ...profileForm, ratesIncludeVat: false });
+                    updateSettings({ ratesIncludeVat: false });
+                  }}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                />
+                <span
+                  className={`text-[11px] font-bold ${
+                    profileForm.ratesIncludeVat === false ? 'text-emerald-700' : 'text-slate-600'
+                  }`}
+                >
+                  {isNl ? 'Exclusief BTW' : 'Excl. VAT'}
+                </span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={profileForm.ratesIncludeVat !== false}
+                  onChange={() => {
+                    setProfileForm({ ...profileForm, ratesIncludeVat: true });
+                    updateSettings({ ratesIncludeVat: true });
+                  }}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                />
+                <span
+                  className={`text-[11px] font-bold ${
+                    profileForm.ratesIncludeVat !== false ? 'text-emerald-700' : 'text-slate-600'
+                  }`}
+                >
+                  {isNl ? 'Inclusief BTW' : 'Incl. VAT'}
+                </span>
+              </label>
+            </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              {isNl ? 'Standaard uurtarief. Schaalt mee met de sessieduur.' : 'Base hourly rate. Scales with duration.'}
+              {isNl
+                ? profileForm.ratesIncludeVat === false
+                  ? 'BTW wordt op de factuur bovenop dit uurtarief berekend.'
+                  : 'BTW zit al inbegrepen in dit uurtarief op de factuur.'
+                : profileForm.ratesIncludeVat === false
+                ? 'VAT is added on top of this hourly rate on invoices.'
+                : 'VAT is already included in this hourly rate on invoices.'}
             </p>
           </div>
 
@@ -568,7 +633,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   onChange={(e) =>
                     setProfileForm({
                       ...profileForm,
-                      cancellationPolicyHours: Number(e.target.value),
+                      cancellationPolicyHours: e.target.value,
                     })
                   }
                   className="w-28 rounded-xl border border-slate-200 p-2 text-slate-900 bg-white focus:border-emerald-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 transition"
@@ -1146,7 +1211,7 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                     type="number"
                     step="0.5"
                     value={serviceForm.basePrice}
-                    onChange={(e) => setServiceForm({ ...serviceForm, basePrice: Number(e.target.value) })}
+                    onChange={(e) => setServiceForm({ ...serviceForm, basePrice: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
                 </div>

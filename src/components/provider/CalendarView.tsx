@@ -78,7 +78,7 @@ export const CalendarView: React.FC = () => {
     date: string;
     startTime: string;
     serviceId: string;
-    price: number;
+    price: number | string;
   }>({
     date: '',
     startTime: '09:00',
@@ -1952,7 +1952,7 @@ export const CalendarView: React.FC = () => {
                             type="number"
                             step="0.5"
                             value={editApptForm.price}
-                            onChange={(e) => setEditApptForm({ ...editApptForm, price: Number(e.target.value) })}
+                            onChange={(e) => setEditApptForm({ ...editApptForm, price: e.target.value })}
                             className="w-full rounded-xl border border-slate-200 bg-white p-2 text-slate-900"
                           />
                         </div>

@@ -31,7 +31,10 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
 
   if (!isOpen) return null;
 
-  const details = getMagicLinkDetails(client.magicToken);
+  const details = getMagicLinkDetails(
+    client.magicToken,
+    (client as any).trainerId || (client as any).userId
+  );
 
   const handleCopy = (text: string, type: 'public' | 'inapp' | 'token') => {
     navigator.clipboard?.writeText(text);

@@ -51,6 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
     firebaseSyncStatus,
     firebaseSyncError,
     forceSyncToFirebase,
+    isTrainerPreview,
+    exitTrainerPreview,
   } = useBooking();
 
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -59,11 +61,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, setCurrentTab }) => 
   const [showFirebaseModal, setShowFirebaseModal] = useState(false);
   const [copiedRules, setCopiedRules] = useState(false);
 
-  const isTrainerAuthenticated = Boolean(auth.currentUser) && role === 'provider';
+  const isTrainerAuthenticated = Boolean(auth.currentUser) && (role === 'provider' || isTrainerPreview);
 
   const firestoreRulesSnippet = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, create, update: if true;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      match /{subcollection}/{docId} {
+        allow read, create, update: if true;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
     match /trainers/{trainerId} {
       allow read, create, update: if true;
       allow delete: if request.auth != null && request.auth.uid == trainerId;
@@ -261,6 +271,25 @@ service cloud.firestore {
 
           {/* Right Actions: Persona Switcher, Currency, Language, Reset */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Direct Back to Trainer Dashboard button when trainer is testing as client */}
+            {role === 'client' && isTrainerPreview && Boolean(auth.currentUser) && (
+              <button
+                type="button"
+                onClick={exitTrainerPreview}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-sm shadow-emerald-500/20 transition shrink-0 cursor-pointer"
+                title={
+                  language === 'nl'
+                    ? 'Keer direct terug naar het Trainer Dashboard'
+                    : 'Return directly to the Trainer Dashboard'
+                }
+              >
+                <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {language === 'nl' ? 'Terug naar Trainer Dashboard' : 'Back to Trainer Dashboard'}
+                </span>
+              </button>
+            )}
+
             {/* Interactive Persona / Role Switcher (only for authenticated trainer; static client badge for public magic link clients) */}
             {isTrainerAuthenticated ? (
               <div className="relative">

@@ -236,15 +236,25 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 hover:bg-slate-50/80 transition"
               >
                 <div className="flex items-start gap-3">
-                  <span className="font-mono font-bold text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg shrink-0">
+                  <span
+                    className={`font-mono font-bold text-xs px-2 py-1 rounded-lg shrink-0 border ${
+                      inv.isCreditNote
+                        ? 'text-rose-700 bg-rose-50 border-rose-200'
+                        : 'text-blue-700 bg-blue-50 border-blue-200'
+                    }`}
+                  >
                     {inv.invoiceNumber}
                   </span>
                   <div className="text-xs">
                     <p className="font-semibold text-slate-800">
-                      {language === 'nl' ? 'Factuurdatum:' : 'Issued:'} {inv.issueDate} • {language === 'nl' ? 'Vervalt:' : 'Due:'} {inv.dueDate}
+                      {inv.isCreditNote
+                        ? `${language === 'nl' ? 'Creditnota datum:' : 'Credit note date:'} ${inv.issueDate}`
+                        : `${language === 'nl' ? 'Factuurdatum:' : 'Issued:'} ${inv.issueDate} • ${language === 'nl' ? 'Vervalt:' : 'Due:'} ${inv.dueDate}`}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      {inv.items?.length || 1} {language === 'nl' ? 'dienst(en) gespecificeerd' : 'line item(s)'}
+                      {inv.isCreditNote && inv.originalInvoiceNumber
+                        ? `${language === 'nl' ? 'Tegenboeking van factuur' : 'Reversal of invoice'} ${inv.originalInvoiceNumber}`
+                        : `${inv.items?.length || 1} ${language === 'nl' ? 'dienst(en) gespecificeerd' : 'line item(s)'}`}
                     </p>
                   </div>
                 </div>

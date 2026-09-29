@@ -149,18 +149,26 @@ export const AuthScreen: React.FC = () => {
     let existingCloudDoc = false;
     let cloudData: any = null;
     try {
-      const snap = await getDoc(doc(db, 'trainers', uid));
-      existingCloudDoc = snap.exists();
-      if (snap.exists()) {
-        cloudData = snap.data();
+      const userSnap = await getDoc(doc(db, 'users', uid));
+      if (userSnap.exists()) {
+        existingCloudDoc = true;
+        cloudData = userSnap.data();
+      } else {
+        const trainerSnap = await getDoc(doc(db, 'trainers', uid));
+        if (trainerSnap.exists()) {
+          existingCloudDoc = true;
+          cloudData = trainerSnap.data();
+        }
       }
     } catch (readErr) {
-      formatFirestoreError(readErr, OperationType.GET, `trainers/${uid}`);
+      formatFirestoreError(readErr, OperationType.GET, `users/${uid}`);
     }
 
-    // Initialize if brand-new trainer, explicit registration, or if cloud doc still has demo fallback "Alex Jansen"
+    // Initialize if brand-new trainer, explicit registration, or if cloud doc still has demo fallback "Alex Jansen" / "Mark Jansen"
     const hasDemoPlaceholder =
-      cloudData?.name === 'Alex Jansen' && firebaseUser.email !== 'alex@probooking.nl';
+      (cloudData?.name === 'Alex Jansen' || cloudData?.name === 'Mark Jansen') &&
+      firebaseUser.email !== 'alex@probooking.nl' &&
+      firebaseUser.email !== 'mark@jansen-performance.nl';
 
     if (!existingCloudDoc || isExplicitRegister || hasDemoPlaceholder || !existingLocalSettings) {
       if (existingCloudDoc && !isExplicitRegister && !hasDemoPlaceholder) {
@@ -199,9 +207,10 @@ export const AuthScreen: React.FC = () => {
 
       const newInvoiceSettings = {
         ...initialInvoiceSettings,
-        businessName: `${trainerName} Coaching`,
+        businessName: trainerName,
         email: trainerEmail,
         phone: trainerPhone,
+        website: '',
       };
 
       localStorage.setItem(`${storagePrefix}_settings`, JSON.stringify(newTrainerSettings));
@@ -221,35 +230,36 @@ export const AuthScreen: React.FC = () => {
         })
       );
 
+      const cleanData = JSON.parse(
+        JSON.stringify({
+          uid,
+          name: trainerName,
+          profession: trainerProfession,
+          email: trainerEmail,
+          phone: trainerPhone,
+          standardHourlyRate: parsedRate,
+          settings: newTrainerSettings,
+          invoiceSettings: newInvoiceSettings,
+          ...(existingCloudDoc
+            ? {}
+            : {
+                clients: initialClients,
+                appointments: initialAppointments,
+                packages: initialPackages,
+                clientPackages: initialClientPackages,
+                messages: initialMessages,
+                invoices: initialInvoices,
+                createdAt: new Date().toISOString(),
+              }),
+          updatedAt: new Date().toISOString(),
+        })
+      );
+
       try {
-        await setDoc(
-          doc(db, 'trainers', uid),
-          {
-            uid,
-            name: trainerName,
-            profession: trainerProfession,
-            email: trainerEmail,
-            phone: trainerPhone,
-            standardHourlyRate: parsedRate,
-            settings: newTrainerSettings,
-            invoiceSettings: newInvoiceSettings,
-            ...(existingCloudDoc
-              ? {}
-              : {
-                  clients: initialClients,
-                  appointments: initialAppointments,
-                  packages: initialPackages,
-                  clientPackages: initialClientPackages,
-                  messages: initialMessages,
-                  invoices: initialInvoices,
-                  createdAt: new Date().toISOString(),
-                }),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+        await setDoc(doc(db, 'users', uid), cleanData, { merge: true });
+        setDoc(doc(db, 'trainers', uid), cleanData, { merge: true }).catch(() => {});
       } catch (dbErr) {
-        formatFirestoreError(dbErr, OperationType.CREATE, `trainers/${uid}`);
+        formatFirestoreError(dbErr, OperationType.CREATE, `users/${uid}`);
       }
     }
   };
@@ -340,7 +350,8 @@ export const AuthScreen: React.FC = () => {
     setLoading(true);
     try {
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        await initializeTrainerProfile(userCredential.user, false);
       } else {
         savePendingRegistrationToStorage();
         const userCredential = await createUserWithEmailAndPassword(
