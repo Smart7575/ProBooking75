@@ -149,11 +149,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
     try {
       setIsGeneratingPdf(true);
       const docPrefix = invoice.isCreditNote
-        ? language === 'nl'
-          ? 'Creditnota'
-          : 'CreditNote'
-        : language === 'nl'
-        ? 'Factuur'
+        ? 'CreditNote'
         : 'Invoice';
       await downloadInvoicePdf('printable-invoice-content', `${docPrefix}-${invoice.invoiceNumber}`);
     } catch (err) {
@@ -189,7 +185,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                 </h3>
                 {invoice.isCreditNote && (
                   <span className="rounded-full bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    {language === 'nl' ? 'Creditnota' : 'Credit Note'}
+                    {'Credit Note'}
                   </span>
                 )}
                 <span
@@ -202,16 +198,14 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   {invoice.status === 'paid'
                     ? t.invoiceStatusPaid
                     : invoice.isCreditNote
-                    ? language === 'nl'
-                      ? 'Te betalen (Credit)'
-                      : 'To be Paid (Credit)'
+                    ? 'To be Paid (Credit)'
                     : t.invoiceStatusSent}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
                 {invoice.clientName} • {formatPrice(effectiveTotalAmount)}
                 {invoice.isCreditNote && invoice.originalInvoiceNumber
-                  ? ` • ${language === 'nl' ? 'Ref:' : 'Ref:'} ${invoice.originalInvoiceNumber}`
+                  ? ` • ${'Ref:'} ${invoice.originalInvoiceNumber}`
                   : ''}
               </p>
             </div>
@@ -229,13 +223,11 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                 }}
                 className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition cursor-pointer"
                 title={
-                  language === 'nl'
-                    ? 'Maak automatisch een creditnota om alle factuurbedragen tegen te boeken'
-                    : 'Automatically create a credit note to reverse all invoice amounts'
+                  'Automatically create a credit note to reverse all invoice amounts'
                 }
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span>{language === 'nl' ? 'Creditnota maken' : 'Create Credit Note'}</span>
+                <span>{'Create Credit Note'}</span>
               </button>
             )}
 
@@ -328,11 +320,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   }`}
                 >
                   {invoice.isCreditNote
-                    ? language === 'nl'
-                      ? 'CREDITNOTA'
-                      : 'CREDIT NOTE'
-                    : language === 'nl'
-                    ? 'FACTUUR'
+                    ? 'CREDIT NOTE'
                     : 'INVOICE'}
                 </span>
                 <p
@@ -349,9 +337,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   <div className="flex justify-between sm:justify-end gap-3">
                     <span className="text-slate-400">
                       {invoice.isCreditNote
-                        ? language === 'nl'
-                          ? 'Datum creditnota'
-                          : 'Credit note date'
+                        ? 'Credit note date'
                         : t.invoiceIssueDate}
                       :
                     </span>
@@ -366,9 +352,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   {invoice.isCreditNote && invoice.originalInvoiceNumber && (
                     <div className="flex justify-between sm:justify-end gap-3 pt-0.5">
                       <span className="text-rose-600 font-semibold">
-                        {language === 'nl'
-                          ? 'Oorspronkelijke factuur:'
-                          : 'Original invoice #:'}
+                        {'Original invoice #:'}
                       </span>
                       <span className="font-mono font-bold text-rose-800">
                         {invoice.originalInvoiceNumber}
@@ -406,7 +390,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   {invoice.clientEmail && <p>{invoice.clientEmail}</p>}
                   {invoice.clientTaxId && (
                     <p className="pt-1 font-mono text-[11px]">
-                      {language === 'nl' ? 'BTW-ID:' : 'VAT ID:'} {invoice.clientTaxId}
+                      {'VAT ID:'} {invoice.clientTaxId}
                     </p>
                   )}
                 </div>
@@ -415,19 +399,19 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
               {/* Sender Legal Details (Compliance) */}
               <div className="sm:text-right space-y-1.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {language === 'nl' ? 'Bedrijfsgegevens & Registratie' : 'Business & Tax Registration'}
+                  {'Business & Tax Registration'}
                 </span>
                 <div className="text-xs text-slate-600 space-y-1">
                   {trainerName && (
                     <p>
-                      <span className="text-slate-400">{language === 'nl' ? 'Trainer:' : 'Trainer:'}</span>{' '}
+                      <span className="text-slate-400">{'Trainer:'}</span>{' '}
                       <strong className="font-semibold text-slate-900">
                         {trainerName}
                       </strong>
                     </p>
                   )}
                   <p>
-                    <span className="text-slate-400">{language === 'nl' ? 'KVK:' : 'CoC:'}</span>{' '}
+                    <span className="text-slate-400">{'CoC:'}</span>{' '}
                     <strong
                       className={
                         effectiveSenderCoc
@@ -436,11 +420,11 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                       }
                     >
                       {effectiveSenderCoc ||
-                        (language === 'nl' ? 'Niet van toepassing' : 'Not applicable')}
+                        ('Not applicable')}
                     </strong>
                   </p>
                   <p>
-                    <span className="text-slate-400">{language === 'nl' ? 'BTW-ID:' : 'VAT ID:'}</span>{' '}
+                    <span className="text-slate-400">{'VAT ID:'}</span>{' '}
                     <strong
                       className={
                         effectiveSenderTaxId
@@ -449,7 +433,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                       }
                     >
                       {effectiveSenderTaxId ||
-                        (language === 'nl' ? 'Niet van toepassing' : 'Not applicable')}
+                        ('Not applicable')}
                     </strong>
                   </p>
                   {effectiveSenderIban && (
@@ -482,12 +466,10 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
             {invoice.isCreditNote && invoice.originalInvoiceNumber && (
               <div className="mt-6 rounded-xl bg-rose-50/80 px-4 py-3 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <span className="font-bold text-rose-900">
-                  {language === 'nl'
-                    ? `Creditnota — Tegenboeking van oorspronkelijke factuur ${invoice.originalInvoiceNumber}`
-                    : `Credit Note — Reversal of original invoice ${invoice.originalInvoiceNumber}`}
+                  {`Credit Note — Reversal of original invoice ${invoice.originalInvoiceNumber}`}
                 </span>
                 <span className="font-mono font-bold text-rose-700">
-                  {language === 'nl' ? 'Verwijzing:' : 'Reference:'} {invoice.originalInvoiceNumber}
+                  {'Reference:'} {invoice.originalInvoiceNumber}
                 </span>
               </div>
             )}
@@ -529,7 +511,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                           <p className="font-bold text-slate-900">{item.description}</p>
                           {item.date && (
                             <span className="text-[11px] text-slate-400">
-                              {language === 'nl' ? 'Datum dienst' : 'Date of service'}: {item.date}
+                              {'Date of service'}: {item.date}
                             </span>
                           )}
                         </td>
@@ -541,9 +523,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                         </td>
                         <td className="py-3.5 px-3 text-right text-slate-500 font-medium text-[11px]">
                           {isVatExemptRegime || item.isVatExempt
-                            ? language === 'nl'
-                              ? 'Vrijgesteld'
-                              : 'Exempt'
+                            ? 'Exempt'
                             : `${item.vatRate}%`}
                         </td>
                         <td className="py-3.5 pl-3 text-right font-bold text-slate-900">
@@ -570,7 +550,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   <span className="font-semibold text-slate-800">
                     {isVatExemptRegime ? (
                       <span className="text-emerald-700 font-bold">
-                        {language === 'nl' ? 'Vrijgesteld' : 'Exempt'}
+                        {'Exempt'}
                       </span>
                     ) : (
                       formatPrice(effectiveTotalVat)
@@ -580,9 +560,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                 <div className="flex justify-between pt-2 border-t-2 border-slate-900 text-sm font-black text-slate-950">
                   <span>
                     {isVatExemptRegime
-                      ? language === 'nl'
-                        ? 'Totaalbedrag (Vrijgesteld van BTW)'
-                        : 'Total (Exempt from VAT)'
+                      ? 'Total (Exempt from VAT)'
                       : t.totalInclVat}:
                   </span>
                   <span className="text-base text-emerald-800 font-extrabold">
@@ -593,7 +571,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                 {isVatExemptRegime && (
                   <div className="pt-2 text-right">
                     <span className="text-[11px] font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
-                      * {language === 'nl' ? 'Factuur vrijgesteld van omzetbelasting (BTW)' : 'Invoice exempt from value added tax (VAT)'}
+                      * {'Invoice exempt from value added tax (VAT)'}
                     </span>
                   </div>
                 )}
@@ -609,22 +587,14 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   }`}
                 />
                 {invoice.isCreditNote
-                  ? language === 'nl'
-                    ? 'Toelichting Creditnota & Verrekening'
-                    : 'Credit Note & Settlement Details'
+                  ? 'Credit Note & Settlement Details'
                   : t.paymentInstructions}
               </h5>
               <p className="leading-relaxed text-slate-600">
                 {invoice.isCreditNote
                   ? invoice.status === 'paid'
-                    ? language === 'nl'
-                      ? `Deze creditnota (${invoice.invoiceNumber}) ter waarde van ${formatPrice(effectiveTotalAmount)} boekt de oorspronkelijke factuur ${invoice.originalInvoiceNumber || ''} volledig tegen en is vereffend.`
-                      : `This credit note (${invoice.invoiceNumber}) for ${formatPrice(effectiveTotalAmount)} reverses original invoice ${invoice.originalInvoiceNumber || ''} in full and is settled.`
-                    : language === 'nl'
-                    ? `Deze creditnota (${invoice.invoiceNumber}) ter waarde van ${formatPrice(effectiveTotalAmount)} betreft een creditering van de reeds betaalde factuur ${invoice.originalInvoiceNumber || ''}. Dit creditbedrag dient nog te worden terugbetaald/verrekend.`
+                    ? `This credit note (${invoice.invoiceNumber}) for ${formatPrice(effectiveTotalAmount)} reverses original invoice ${invoice.originalInvoiceNumber || ''} in full and is settled.`
                     : `This credit note (${invoice.invoiceNumber}) for ${formatPrice(effectiveTotalAmount)} credits already-paid invoice ${invoice.originalInvoiceNumber || ''}. This credit amount is pending refund/settlement.`
-                  : language === 'nl'
-                  ? `Gelieve het totaalbedrag van ${formatPrice(effectiveTotalAmount)} vóór ${invoice.dueDate} over te maken naar rekening ${effectiveSenderIban} t.n.v. ${effectiveSenderName}, onder vermelding van factuurnummer ${invoice.invoiceNumber}.`
                   : `Please remit payment of ${formatPrice(effectiveTotalAmount)} on or before ${invoice.dueDate} to bank account ${effectiveSenderIban} (${effectiveSenderName}) quoting invoice number ${invoice.invoiceNumber} as payment reference.`}
               </p>
               {invoice.notes && (

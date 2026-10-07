@@ -9,23 +9,15 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, formatFirestoreError, OperationType } from '../../firebase';
-import {
-  initialSettings,
-  initialInvoiceSettings,
-  initialClients,
-  initialAppointments,
-  initialPackages,
-  initialClientPackages,
-  initialMessages,
-  initialInvoices,
-} from '../../data/initialData';
+import { auth, db } from '../../firebase';
+import { initialSettings, initialInvoiceSettings } from '../../data/initialData';
+import { formatFirestoreError, OperationType } from '../../utils/firestoreErrors';
 import {
   Lock,
   Mail,
   User,
-  Phone,
   Briefcase,
+  Phone,
   Coins,
   Eye,
   EyeOff,
@@ -34,34 +26,9 @@ import {
   Calendar,
   CheckCircle2,
   Database,
-  Globe,
 } from 'lucide-react';
-import { AppLanguage } from '../../types';
-
-const LANGUAGE_STORAGE_KEY = 'probooking_language';
 
 export const AuthScreen: React.FC = () => {
-  const [language, setLanguageState] = useState<AppLanguage>(() => {
-    try {
-      const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-      if (saved === 'en' || saved === 'nl') return saved;
-    } catch {
-      // ignore
-    }
-    return 'en';
-  });
-
-  const setLanguage = (lang: AppLanguage) => {
-    setLanguageState(lang);
-    try {
-      localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
-    } catch {
-      // ignore
-    }
-  };
-
-  const isNl = language === 'nl';
-
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
   const [profession, setProfession] = useState('');
@@ -81,60 +48,31 @@ export const AuthScreen: React.FC = () => {
       case 'auth/invalid-credential':
       case 'auth/wrong-password':
       case 'auth/user-not-found':
-        return isNl
-          ? 'Ongeldig e-mailadres of wachtwoord. Controleer je gegevens en probeer het opnieuw.'
-          : 'Invalid email or password. Please check your credentials and try again.';
+        return 'Invalid email or password. Please check your credentials and try again.';
       case 'auth/email-already-in-use':
-        return isNl
-          ? 'Dit e-mailadres is al in gebruik. Log in of gebruik een ander e-mailadres.'
-          : 'This email address is already in use. Please sign in or use a different email.';
+        return 'This email address is already in use. Please sign in or use a different email.';
       case 'auth/weak-password':
-        return isNl
-          ? 'Het wachtwoord is te zwak. Gebruik minimaal 6 tekens.'
-          : 'Password is too weak. Please use at least 6 characters.';
+        return 'Password is too weak. Please use at least 6 characters.';
       case 'auth/invalid-email':
-        return isNl
-          ? 'Voer een geldig e-mailadres in.'
-          : 'Please enter a valid email address.';
+        return 'Please enter a valid email address.';
       case 'auth/too-many-requests':
-        return isNl
-          ? 'Te veel mislukte pogingen. Wacht even en probeer het later opnieuw.'
-          : 'Too many failed attempts. Please wait a moment and try again later.';
+        return 'Too many failed attempts. Please wait a moment and try again later.';
       case 'auth/network-request-failed':
-        return isNl
-          ? 'Netwerkfout. Controleer je internetverbinding.'
-          : 'Network error. Please check your internet connection.';
+        return 'Network error. Please check your internet connection.';
       case 'auth/popup-closed-by-user':
-        return isNl
-          ? 'Het inlogvenster is gesloten voordat het inloggen was voltooid.'
-          : 'The sign-in window was closed before authentication completed.';
+        return 'The sign-in window was closed before authentication completed.';
       case 'auth/popup-blocked':
-        return isNl
-          ? 'De pop-up werd geblokkeerd door je browser. Sta pop-ups toe voor deze website en probeer het opnieuw.'
-          : 'The pop-up was blocked by your browser. Please allow pop-ups for this website and try again.';
+        return 'The pop-up was blocked by your browser. Please allow pop-ups for this website and try again.';
       case 'auth/cancelled-popup-request':
-        return isNl
-          ? 'Er is al een inlogvenster geopend. Voltooi die actie eerst.'
-          : 'A sign-in window is already open. Please complete that action first.';
+        return 'A sign-in window is already open. Please complete that action first.';
       case 'auth/operation-not-allowed':
-        return isNl
-          ? 'Deze inlogmethode (Google of Apple) is nog niet geactiveerd in Firebase. Schakel de provider in via Firebase Console > Authentication > Sign-in method.'
-          : 'This sign-in method (Google or Apple) is not yet enabled in Firebase. Enable the provider in Firebase Console > Authentication > Sign-in method.';
+        return 'This sign-in method (Google or Apple) is not yet enabled in Firebase. Enable the provider in Firebase Console > Authentication > Sign-in method.';
       case 'auth/unauthorized-domain':
-        return isNl
-          ? `Dit domein (${window.location.hostname}) is nog niet geautoriseerd in Firebase. Voeg dit domein toe in Firebase Console > Authentication > Settings > Authorized domains.`
-          : `This domain (${window.location.hostname}) is not yet authorized in Firebase. Add it in Firebase Console > Authentication > Settings > Authorized domains.`;
+        return `This domain (${window.location.hostname}) is not yet authorized in Firebase. Add it in Firebase Console > Authentication > Settings > Authorized domains.`;
       case 'auth/account-exists-with-different-credential':
-        return isNl
-          ? 'Er bestaat al een account met dit e-mailadres via een andere inlogmethode.'
-          : 'An account already exists with the same email address using a different sign-in provider.';
+        return 'An account already exists with the same email address using a different sign-in provider.';
       default:
-        return (
-          err?.message ||
-          (isNl
-            ? 'Er is een fout opgetreden bij het authenticeren.'
-            : 'An error occurred during authentication.')
-        );
+        return err?.message || 'An error occurred during authentication.';
     }
   };
 
@@ -164,7 +102,6 @@ export const AuthScreen: React.FC = () => {
       formatFirestoreError(readErr, OperationType.GET, `users/${uid}`);
     }
 
-    // Initialize if brand-new trainer, explicit registration, or if cloud doc still has demo fallback "Alex Jansen" / "Mark Jansen"
     const hasDemoPlaceholder =
       (cloudData?.name === 'Alex Jansen' || cloudData?.name === 'Mark Jansen') &&
       firebaseUser.email !== 'alex@probooking.nl' &&
@@ -183,7 +120,7 @@ export const AuthScreen: React.FC = () => {
       const trainerPhone =
         phone.trim() ||
         firebaseUser.phoneNumber ||
-        (isNl ? '+31 6 12345678' : '+1 (555) 123-4567');
+        '+1 (555) 123-4567';
       const parsedRate = Number(hourlyRate) > 0 ? Number(hourlyRate) : 65;
       const trainerEmail = firebaseUser.email || email.trim() || initialSettings.email;
 
@@ -202,70 +139,49 @@ export const AuthScreen: React.FC = () => {
         email: trainerEmail,
         phone: trainerPhone,
         standardHourlyRate: parsedRate,
-        availabilityMode: 'adhoc' as const,
       };
 
       const newInvoiceSettings = {
         ...initialInvoiceSettings,
-        businessName: trainerName,
+        businessName: `${trainerName} Coaching`,
         email: trainerEmail,
         phone: trainerPhone,
-        website: '',
       };
 
       localStorage.setItem(`${storagePrefix}_settings`, JSON.stringify(newTrainerSettings));
-      localStorage.setItem(
-        `${storagePrefix}_invoiceSettings`,
-        JSON.stringify(newInvoiceSettings)
-      );
+      localStorage.setItem(`${storagePrefix}_invoiceSettings`, JSON.stringify(newInvoiceSettings));
+      localStorage.setItem(`${storagePrefix}_clients`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_appointments`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_packages`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_clientPackages`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_messages`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_invoices`, JSON.stringify([]));
+      localStorage.setItem(`${storagePrefix}_groupSessions`, JSON.stringify([]));
 
-      // Notify BookingContext immediately in case it already mounted via onAuthStateChanged
-      window.dispatchEvent(
-        new CustomEvent('probooking:profile-initialized', {
-          detail: {
-            uid,
-            settings: newTrainerSettings,
-            invoiceSettings: newInvoiceSettings,
-          },
-        })
-      );
-
-      const cleanData = JSON.parse(
-        JSON.stringify({
-          uid,
-          name: trainerName,
-          profession: trainerProfession,
-          email: trainerEmail,
-          phone: trainerPhone,
-          standardHourlyRate: parsedRate,
-          settings: newTrainerSettings,
-          invoiceSettings: newInvoiceSettings,
-          ...(existingCloudDoc
-            ? {}
-            : {
-                clients: initialClients,
-                appointments: initialAppointments,
-                packages: initialPackages,
-                clientPackages: initialClientPackages,
-                messages: initialMessages,
-                invoices: initialInvoices,
-                createdAt: new Date().toISOString(),
-              }),
-          updatedAt: new Date().toISOString(),
-        })
-      );
+      const payload = {
+        settings: newTrainerSettings,
+        invoiceSettings: newInvoiceSettings,
+        clients: [],
+        appointments: [],
+        packages: [],
+        clientPackages: [],
+        messages: [],
+        invoices: [],
+        groupSessions: [],
+        updatedAt: new Date().toISOString(),
+      };
 
       try {
-        await setDoc(doc(db, 'users', uid), cleanData, { merge: true });
-        setDoc(doc(db, 'trainers', uid), cleanData, { merge: true }).catch(() => {});
-      } catch (dbErr) {
-        formatFirestoreError(dbErr, OperationType.CREATE, `users/${uid}`);
+        await setDoc(doc(db, 'users', uid), payload, { merge: true });
+        setDoc(doc(db, 'trainers', uid), payload, { merge: true }).catch(() => {});
+      } catch (err) {
+        formatFirestoreError(err, OperationType.WRITE, `users/${uid}`);
       }
     }
   };
 
   const savePendingRegistrationToStorage = () => {
-    if (mode === 'register' || name.trim() || profession.trim() || phone.trim()) {
+    if (mode === 'register' && name.trim()) {
       localStorage.setItem(
         'probooking_pending_registration',
         JSON.stringify({
@@ -312,37 +228,21 @@ export const AuthScreen: React.FC = () => {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError(
-        isNl
-          ? 'Vul zowel je e-mailadres als wachtwoord in.'
-          : 'Please enter both your email address and password.'
-      );
+      setError('Please enter both your email address and password.');
       return;
     }
 
     if (mode === 'register') {
       if (!name.trim()) {
-        setError(
-          isNl
-            ? 'Vul je naam in om je als trainer te registreren.'
-            : 'Please enter your full name to register as a trainer.'
-        );
+        setError('Please enter your full name to register as a trainer.');
         return;
       }
       if (password.length < 6) {
-        setError(
-          isNl
-            ? 'Het wachtwoord moet minimaal 6 tekens bevatten.'
-            : 'Password must be at least 6 characters long.'
-        );
+        setError('Password must be at least 6 characters long.');
         return;
       }
       if (password !== confirmPassword) {
-        setError(
-          isNl
-            ? 'De ingevoerde wachtwoorden komen niet overeen.'
-            : 'The entered passwords do not match.'
-        );
+        setError('The entered passwords do not match.');
         return;
       }
     }
@@ -401,38 +301,7 @@ export const AuthScreen: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
             <Database className="h-4 w-4 text-emerald-400" />
-            <span>{isNl ? 'Gekoppeld aan probooking75' : 'Connected to probooking75'}</span>
-          </div>
-
-          {/* Language Selector (EN / NL) */}
-          <div
-            className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/90 p-1 text-xs"
-            role="group"
-            aria-label="Language selector"
-          >
-            <Globe className="h-3.5 w-3.5 text-emerald-400 ml-1.5 mr-0.5 shrink-0" />
-            <button
-              type="button"
-              onClick={() => setLanguage('en')}
-              className={`rounded-lg px-2.5 py-1 font-bold transition cursor-pointer ${
-                language === 'en'
-                  ? 'bg-emerald-500 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              onClick={() => setLanguage('nl')}
-              className={`rounded-lg px-2.5 py-1 font-bold transition cursor-pointer ${
-                language === 'nl'
-                  ? 'bg-emerald-500 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              NL
-            </button>
+            <span>Connected to probooking75</span>
           </div>
         </div>
       </header>
@@ -445,45 +314,27 @@ export const AuthScreen: React.FC = () => {
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-400">
                 <Calendar className="h-3.5 w-3.5" />
-                <span>
-                  {isNl ? 'Trainer & Cliënt Cloud Database' : 'Trainer & Client Cloud Database'}
-                </span>
+                <span>Trainer & Client Cloud Database</span>
               </div>
               <h1 className="text-2xl font-extrabold tracking-tight text-white leading-snug">
-                {isNl
-                  ? 'Registreer je trainerprofiel en beheer je cliënten in de cloud.'
-                  : 'Register your trainer profile and manage your clients in the cloud.'}
+                Register your trainer profile and manage your clients in the cloud.
               </h1>
               <p className="text-xs text-slate-400 leading-relaxed">
-                {isNl
-                  ? 'Alle trainergegevens, cliëntregistraties, werktijden, afspraken en facturen worden direct gesynchroniseerd met de Firebase Firestore database.'
-                  : 'All trainer details, client registrations, working hours, appointments, and invoices are directly synchronized with the Firebase Firestore database.'}
+                All trainer details, client registrations, working hours, appointments, and invoices are directly synchronized with the Firebase Firestore database.
               </p>
 
               <div className="space-y-3 pt-2">
                 <div className="flex items-start gap-2.5 text-xs text-slate-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>
-                    {isNl
-                      ? 'Trainergegevens & tarieven opgeslagen in Firestore'
-                      : 'Trainer profile & rates stored in Firestore'}
-                  </span>
+                  <span>Trainer profile & rates stored in Firestore</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-slate-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>
-                    {isNl
-                      ? 'Cliënten registreren en beheren met Magic Booking Links'
-                      : 'Register and manage clients with Magic Booking Links'}
-                  </span>
+                  <span>Register and manage clients with Magic Booking Links</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-slate-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>
-                    {isNl
-                      ? 'Realtime synchronisatie tussen al je apparaten'
-                      : 'Real-time synchronization across all your devices'}
-                  </span>
+                  <span>Real-time synchronization across all your devices</span>
                 </div>
               </div>
             </div>
@@ -507,7 +358,7 @@ export const AuthScreen: React.FC = () => {
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                {isNl ? 'Inloggen' : 'Sign In'}
+                Sign In
               </button>
               <button
                 type="button"
@@ -518,28 +369,18 @@ export const AuthScreen: React.FC = () => {
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                {isNl ? 'Trainer Registreren' : 'Register Trainer'}
+                Register Trainer
               </button>
             </div>
 
             <div className="mb-5">
               <h2 className="text-xl font-extrabold text-slate-900">
-                {mode === 'login'
-                  ? isNl
-                    ? 'Welkom terug'
-                    : 'Welcome back'
-                  : isNl
-                    ? 'Registreer als Trainer'
-                    : 'Register as Trainer'}
+                {mode === 'login' ? 'Welcome back' : 'Register as Trainer'}
               </h2>
               <p className="text-xs text-slate-500 mt-1">
                 {mode === 'login'
-                  ? isNl
-                    ? 'Log in met Google, Apple of je e-mailadres om je agenda en cliënten te openen.'
-                    : 'Sign in with Google, Apple, or your email address to access your schedule and clients.'
-                  : isNl
-                    ? 'Maak snel een nieuw trainer-account aan met Google, Apple of je e-mailadres.'
-                    : 'Quickly create a new trainer account with Google, Apple, or your email address.'}
+                  ? 'Sign in with Google, Apple, or your email address to access your schedule and clients.'
+                  : 'Quickly create a new trainer account with Google, Apple, or your email address.'}
               </p>
             </div>
 
@@ -578,16 +419,10 @@ export const AuthScreen: React.FC = () => {
                 </svg>
                 <span>
                   {oauthLoading === 'google'
-                    ? isNl
-                      ? 'Verbinden...'
-                      : 'Connecting...'
+                    ? 'Connecting...'
                     : mode === 'login'
-                      ? isNl
-                        ? 'Inloggen met Google'
-                        : 'Sign in with Google'
-                      : isNl
-                        ? 'Registreren met Google'
-                        : 'Register with Google'}
+                      ? 'Sign in with Google'
+                      : 'Register with Google'}
                 </span>
               </button>
 
@@ -602,16 +437,10 @@ export const AuthScreen: React.FC = () => {
                 </svg>
                 <span>
                   {oauthLoading === 'apple'
-                    ? isNl
-                      ? 'Verbinden...'
-                      : 'Connecting...'
+                    ? 'Connecting...'
                     : mode === 'login'
-                      ? isNl
-                        ? 'Inloggen met Apple'
-                        : 'Sign in with Apple'
-                      : isNl
-                        ? 'Registreren met Apple'
-                        : 'Register with Apple'}
+                      ? 'Sign in with Apple'
+                      : 'Register with Apple'}
                 </span>
               </button>
             </div>
@@ -620,13 +449,7 @@ export const AuthScreen: React.FC = () => {
             <div className="relative flex items-center py-1.5 mb-3">
               <div className="flex-grow border-t border-slate-200" />
               <span className="shrink-0 mx-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {mode === 'login'
-                  ? isNl
-                    ? 'of met e-mailadres'
-                    : 'or with email address'
-                  : isNl
-                    ? 'of registreer met e-mailadres'
-                    : 'or register with email address'}
+                {mode === 'login' ? 'or with email address' : 'or register with email address'}
               </span>
               <div className="flex-grow border-t border-slate-200" />
             </div>
@@ -637,7 +460,7 @@ export const AuthScreen: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {isNl ? 'Volledige Naam *' : 'Full Name *'}
+                        Full Name *
                       </label>
                       <div className="relative">
                         <User className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -654,7 +477,7 @@ export const AuthScreen: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {isNl ? 'Specialisme / Beroep' : 'Profession / Specialty'}
+                        Profession / Specialty
                       </label>
                       <div className="relative">
                         <Briefcase className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -662,7 +485,7 @@ export const AuthScreen: React.FC = () => {
                           type="text"
                           value={profession}
                           onChange={(e) => setProfession(e.target.value)}
-                          placeholder={isNl ? 'Personal Trainer & Coach' : 'Personal Trainer & Coach'}
+                          placeholder="Personal Trainer & Coach"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
                         />
                       </div>
@@ -672,7 +495,7 @@ export const AuthScreen: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {isNl ? 'Telefoonnummer' : 'Phone Number'}
+                        Phone Number
                       </label>
                       <div className="relative">
                         <Phone className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -680,7 +503,7 @@ export const AuthScreen: React.FC = () => {
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          placeholder={isNl ? '+31 6 12345678' : '+1 (555) 123-4567'}
+                          placeholder="+1 (555) 123-4567"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
                         />
                       </div>
@@ -688,7 +511,7 @@ export const AuthScreen: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {isNl ? 'Standaard Uurtarief' : 'Standard Hourly Rate'}
+                        Standard Hourly Rate
                       </label>
                       <div className="relative">
                         <Coins className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -709,7 +532,7 @@ export const AuthScreen: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {isNl ? 'E-mailadres *' : 'Email Address *'}
+                  Email Address *
                 </label>
                 <div className="relative">
                   <Mail className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -719,7 +542,7 @@ export const AuthScreen: React.FC = () => {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={isNl ? 'naam@voorbeeld.nl' : 'name@example.com'}
+                    placeholder="name@example.com"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
                   />
                 </div>
@@ -728,7 +551,7 @@ export const AuthScreen: React.FC = () => {
               <div className={mode === 'register' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {isNl ? 'Wachtwoord *' : 'Password *'}
+                    Password *
                   </label>
                   <div className="relative">
                     <Lock className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -738,13 +561,7 @@ export const AuthScreen: React.FC = () => {
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={
-                        mode === 'register'
-                          ? isNl
-                            ? 'Min. 6 tekens'
-                            : 'Min. 6 characters'
-                          : '••••••••'
-                      }
+                      placeholder={mode === 'register' ? 'Min. 6 characters' : '••••••••'}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
                     />
                     <button
@@ -765,7 +582,7 @@ export const AuthScreen: React.FC = () => {
                 {mode === 'register' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {isNl ? 'Bevestig wachtwoord *' : 'Confirm Password *'}
+                      Confirm Password *
                     </label>
                     <div className="relative">
                       <Lock className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -775,7 +592,7 @@ export const AuthScreen: React.FC = () => {
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder={isNl ? 'Herhaal wachtwoord' : 'Repeat password'}
+                        placeholder="Repeat password"
                         className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
                       />
                     </div>
@@ -790,20 +607,12 @@ export const AuthScreen: React.FC = () => {
               >
                 {loading ? (
                   <span>
-                    {isNl
-                      ? `Bezig met ${mode === 'login' ? 'inloggen...' : 'registreren...'}`
-                      : `${mode === 'login' ? 'Signing in...' : 'Registering...'}`}
+                    {mode === 'login' ? 'Signing in...' : 'Registering...'}
                   </span>
                 ) : (
                   <>
                     <span>
-                      {mode === 'login'
-                        ? isNl
-                          ? 'Inloggen'
-                          : 'Sign In'
-                        : isNl
-                          ? 'Trainer Account Registreren'
-                          : 'Register Trainer Account'}
+                      {mode === 'login' ? 'Sign In' : 'Register Trainer Account'}
                     </span>
                     <ArrowRight className="h-4 w-4" />
                   </>
@@ -814,24 +623,24 @@ export const AuthScreen: React.FC = () => {
             <div className="mt-5 pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
               {mode === 'login' ? (
                 <>
-                  {isNl ? 'Nog geen trainer-account?' : "Don't have a trainer account yet?"}{' '}
+                  Don't have a trainer account yet?{' '}
                   <button
                     type="button"
                     onClick={() => switchMode('register')}
                     className="font-bold text-emerald-600 hover:text-emerald-700 underline-offset-2 hover:underline cursor-pointer"
                   >
-                    {isNl ? 'Registreer je hier' : 'Register here'}
+                    Register here
                   </button>
                 </>
               ) : (
                 <>
-                  {isNl ? 'Heb je al een account?' : 'Already have an account?'}{' '}
+                  Already have an account?{' '}
                   <button
                     type="button"
                     onClick={() => switchMode('login')}
                     className="font-bold text-emerald-600 hover:text-emerald-700 underline-offset-2 hover:underline cursor-pointer"
                   >
-                    {isNl ? 'Log hier in' : 'Sign in here'}
+                    Sign in here
                   </button>
                 </>
               )}
@@ -842,9 +651,7 @@ export const AuthScreen: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 py-4 text-center text-xs text-slate-500">
-        {isNl
-          ? 'ProBooking • Gekoppeld aan Firebase Firestore & Authentication (probooking75)'
-          : 'ProBooking • Connected to Firebase Firestore & Authentication (probooking75)'}
+        ProBooking • Connected to Firebase Firestore & Authentication (probooking75)
       </footer>
     </div>
   );

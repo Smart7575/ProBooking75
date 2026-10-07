@@ -31,8 +31,12 @@ import {
   BillingStatus,
   BillingItem,
   Invoice,
+  InvoiceStatus,
   InvoiceSettings,
   InvoiceLineItem,
+  GroupSession,
+  GroupSessionParticipant,
+  ProBookingBackupData,
 } from '../types';
 import {
   initialSettings,
@@ -43,6 +47,7 @@ import {
   initialMessages,
   initialInvoiceSettings,
   initialInvoices,
+  initialGroupSessions,
 } from '../data/initialData';
 import {
   parseDateISO,
@@ -221,6 +226,28 @@ interface BookingContextType {
     updates: Partial<Appointment>
   ) => void;
   deleteAppointment: (appointmentId: string) => void;
+
+  // Group Sessions
+  groupSessions: GroupSession[];
+  addGroupSession: (
+    data: Omit<GroupSession, 'id' | 'createdAt' | 'participants'> & {
+      participants?: GroupSessionParticipant[];
+    }
+  ) => GroupSession;
+  updateGroupSession: (id: string, updates: Partial<GroupSession>) => void;
+  deleteGroupSession: (id: string) => void;
+  bookGroupSessionSpot: (
+    groupSessionId: string,
+    clientId: string,
+    clientPackageId?: string
+  ) => { success: boolean; message: string; appointment?: Appointment };
+  cancelGroupSessionSpot: (
+    groupSessionId: string,
+    clientId: string,
+    reason?: string
+  ) => { success: boolean; message: string };
+  isClientInGroupSession: (groupSessionId: string, clientId: string) => boolean;
+  getGroupSessionSpotsLeft: (groupSessionId: string) => number;
   
   // Invoicing & Billing
   updateBillingItemStatus: (
@@ -257,6 +284,21 @@ interface BookingContextType {
   // Helpers
   resetDemoData: () => void;
   clearDemoData: () => Promise<void>;
+  exportAllData: () => ProBookingBackupData;
+  importAllData: (
+    backup: ProBookingBackupData | string,
+    mode?: 'replace' | 'merge'
+  ) => {
+    success: boolean;
+    message: string;
+    stats?: {
+      clientsCount: number;
+      appointmentsCount: number;
+      invoicesCount: number;
+      packagesCount: number;
+      groupSessionsCount: number;
+    };
+  };
   currentClient: Client | undefined;
 
   // Magic Link testing & simulation
@@ -373,20 +415,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     },
     [role, magicLinkNotification, exitTrainerPreview]
   );
-  const [language, setLanguageState] = useState<AppLanguage>(() => {
-    try {
-      const savedLang = localStorage.getItem('probooking_language');
-      if (savedLang === 'en' || savedLang === 'nl') return savedLang;
-    } catch {
-      // ignore
-    }
-    return 'en';
-  });
+  const [language] = useState<AppLanguage>('en');
 
-  const setLanguage = useCallback((lang: AppLanguage) => {
-    setLanguageState(lang);
+  const setLanguage = useCallback((_lang: AppLanguage) => {
     try {
-      localStorage.setItem('probooking_language', lang);
+      localStorage.setItem('probooking_language', 'en');
     } catch {
       // ignore
     }
@@ -510,6 +543,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`${userStoragePrefix}_messages`);
     return saved ? JSON.parse(saved) : initialMessages;
+  });
+
+  const [groupSessions, setGroupSessions] = useState<GroupSession[]>(() => {
+    const saved = localStorage.getItem(`${userStoragePrefix}_groupSessions`);
+    return saved ? JSON.parse(saved) : initialGroupSessions;
   });
 
   const [selectedChatClientId, setSelectedChatClientId] = useState<string>('cli-1');
@@ -991,6 +1029,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   useEffect(() => {
     if (isAccountDeletingRef.current) return;
+    localStorage.setItem(`${userStoragePrefix}_groupSessions`, JSON.stringify(groupSessions));
+  }, [groupSessions, userStoragePrefix]);
+
+  useEffect(() => {
+    if (isAccountDeletingRef.current) return;
     localStorage.setItem(`${userStoragePrefix}_invoiceSettings`, JSON.stringify(invoiceSettings));
   }, [invoiceSettings, userStoragePrefix]);
 
@@ -1179,7 +1222,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [clients]);
 
-  const t = translations[language];
+  const t = translations.en;
 
   // Currency management
   const currency = useMemo<SupportedCurrency>(() => {
@@ -1839,7 +1882,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             breakEnd: daySched.breakEnd,
             slotDuration: daySched.slotDuration,
             bufferMinutes: daySched.bufferMinutes,
-            notes: language === 'nl' ? 'Vast weekrooster' : 'Fixed weekly schedule',
+            notes: 'Fixed weekly schedule',
           },
           isSyntheticWeekly: true,
         };
@@ -1915,7 +1958,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
                 breakEnd: daySched.breakEnd,
                 slotDuration: daySched.slotDuration,
                 bufferMinutes: daySched.bufferMinutes,
-                notes: language === 'nl' ? 'Vast weekrooster' : 'Fixed weekly schedule',
+                notes: 'Fixed weekly schedule',
               },
             ];
           }
@@ -2031,10 +2074,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           breakEnd: dayConfig.breakEnd || undefined,
           slotDuration: dayConfig.slotDuration,
           bufferMinutes: dayConfig.bufferMinutes,
-          notes:
-            language === 'nl'
-              ? `Vast weekrooster (${startDate} t/m ${endDate})`
-              : `Fixed weekly schedule (${startDate} to ${endDate})`,
+          notes: `Fixed weekly schedule (${startDate} to ${endDate})`,
         });
         appliedCount++;
       }
@@ -2061,7 +2101,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         mode: settings.availabilityMode || 'weekly',
         blocks: [],
         totalHours: 0,
-        description: language === 'nl' ? 'Vakantie / Geblokkeerd' : 'Vacation / Blocked',
+        description: 'Vacation / Blocked',
       };
     }
 
@@ -2102,7 +2142,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         mode: 'adhoc' as AvailabilityMode,
         blocks: [],
         totalHours: 0,
-        description: language === 'nl' ? 'Niet ingepland' : 'Not scheduled',
+        description: 'Not scheduled',
       };
     } else {
       const dateObj = parseDateISO(dateStr);
@@ -2115,7 +2155,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           mode: 'weekly' as AvailabilityMode,
           blocks: [],
           totalHours: 0,
-          description: language === 'nl' ? 'Vaste vrije dag' : 'Regular day off',
+          description: 'Regular day off',
         };
       }
       let mins = endTimeToMinutes(daySched.endTime) - timeToMinutes(daySched.startTime);
@@ -2301,6 +2341,24 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               }
             }
 
+            // 3. Check collision with active scheduled group sessions on this day
+            if (!collidesWithAppt) {
+              for (const gs of groupSessions) {
+                if (gs.date === dateStr && gs.status === 'scheduled') {
+                  const gsStart = timeToMinutes(gs.startTime);
+                  const gsEnd = endTimeToMinutes(gs.endTime);
+                  const directOverlap = Math.max(slotStart, gsStart) < Math.min(slotEnd, gsEnd);
+                  const preBufferViolation = buffer > 0 && slotEnd > (gsStart - buffer) && slotStart < gsStart;
+                  const postBufferViolation = buffer > 0 && slotStart < (gsEnd + buffer) && slotEnd > gsEnd;
+
+                  if (directOverlap || preBufferViolation || postBufferViolation) {
+                    collidesWithAppt = true;
+                    break;
+                  }
+                }
+              }
+            }
+
             // If not booked, this slot is available for booking
             if (!collidesWithAppt) {
               availableSlots.push({
@@ -2317,7 +2375,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       return availableSlots;
     },
-    [appointments, settings]
+    [appointments, groupSessions, settings]
   );
 
   // Appointment Actions
@@ -2575,6 +2633,371 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  // Group Sessions Management & Booking
+  const addGroupSession = (
+    data: Omit<GroupSession, 'id' | 'createdAt' | 'participants'> & {
+      participants?: GroupSessionParticipant[];
+    }
+  ): GroupSession => {
+    const newGs: GroupSession = {
+      ...data,
+      id: `grp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      status: data.status || 'scheduled',
+      participants: data.participants || [],
+      createdAt: formatDateISO(new Date()),
+    };
+
+    // If pre-assigned participants, create corresponding appointments
+    if (newGs.participants && newGs.participants.length > 0) {
+      const newAppts: Appointment[] = newGs.participants
+        .filter((p) => p.status === 'confirmed')
+        .map((p) => ({
+          id: `apt-grp-${Date.now()}-${p.clientId}`,
+          clientId: p.clientId,
+          serviceId: newGs.serviceId || 'grp-service',
+          date: newGs.date,
+          startTime: newGs.startTime,
+          endTime: newGs.endTime,
+          durationMinutes: newGs.durationMinutes,
+          price: p.price ?? newGs.price,
+          status: 'reserved',
+          createdAt: formatDateISO(new Date()),
+          isGroupSession: true,
+          groupSessionId: newGs.id,
+          groupSessionTitle: newGs.title,
+          maxParticipants: newGs.maxParticipants,
+          packageId: p.packageId,
+          packageName: p.packageName,
+        }));
+
+      if (newAppts.length > 0) {
+        setAppointments((prev) => [...newAppts, ...prev]);
+      }
+    }
+
+    setGroupSessions((prev) => [newGs, ...prev]);
+    return newGs;
+  };
+
+  const updateGroupSession = (id: string, updates: Partial<GroupSession>) => {
+    setGroupSessions((prev) =>
+      prev.map((gs) => {
+        if (gs.id !== id) return gs;
+        const updated = { ...gs, ...updates };
+
+        // Synchronize linked appointments
+        if (
+          updates.date ||
+          updates.startTime ||
+          updates.endTime ||
+          updates.title ||
+          updates.maxParticipants !== undefined ||
+          updates.durationMinutes !== undefined
+        ) {
+          setAppointments((prevAppts) =>
+            prevAppts.map((a) => {
+              if (a.groupSessionId === id) {
+                return {
+                  ...a,
+                  date: updates.date || a.date,
+                  startTime: updates.startTime || a.startTime,
+                  endTime: updates.endTime || a.endTime,
+                  groupSessionTitle: updates.title || a.groupSessionTitle,
+                  maxParticipants: updates.maxParticipants ?? a.maxParticipants,
+                  durationMinutes: updates.durationMinutes ?? a.durationMinutes,
+                };
+              }
+              return a;
+            })
+          );
+        }
+        return updated;
+      })
+    );
+  };
+
+  const deleteGroupSession = (id: string) => {
+    // Refund any package sessions if booked via package
+    const linkedAppts = appointments.filter((a) => a.groupSessionId === id && a.status === 'reserved');
+    linkedAppts.forEach((a) => {
+      if (a.packageId) {
+        setClientPackages((prev) =>
+          prev.map((cp) => {
+            if (cp.id === a.packageId) {
+              const restored =
+                Math.round((cp.remainingSessions + (a.packageSessionsDeducted ?? 1)) * 100) / 100;
+              return {
+                ...cp,
+                remainingSessions: restored,
+                status: restored > 0 ? 'active' : cp.status,
+              };
+            }
+            return cp;
+          })
+        );
+      }
+    });
+
+    setAppointments((prev) =>
+      prev.map((a) =>
+        a.groupSessionId === id
+          ? {
+              ...a,
+              status: 'cancelled' as AppointmentStatus,
+              cancelledAt: new Date().toISOString(),
+              cancellationReason: 'Group session cancelled by trainer',
+            }
+          : a
+      )
+    );
+
+    setGroupSessions((prev) => prev.filter((gs) => gs.id !== id));
+  };
+
+  const bookGroupSessionSpot = (
+    groupSessionId: string,
+    clientId: string,
+    clientPackageId?: string
+  ): { success: boolean; message: string; appointment?: Appointment } => {
+    const gs = groupSessions.find((g) => g.id === groupSessionId);
+    if (!gs) {
+      return {
+        success: false,
+        message: 'Group session not found.',
+      };
+    }
+
+    if (gs.status !== 'scheduled') {
+      return {
+        success: false,
+        message: 'This group session is no longer active.',
+      };
+    }
+
+    const confirmed = (gs.participants || []).filter((p) => p.status === 'confirmed');
+
+    // Check capacity
+    if (confirmed.length >= gs.maxParticipants) {
+      return {
+        success: false,
+        message: `This group session is fully booked (maximum ${gs.maxParticipants} participants reached).`,
+      };
+    }
+
+    // Check duplicate
+    if (confirmed.some((p) => p.clientId === clientId)) {
+      return {
+        success: false,
+        message: 'You are already registered for this group session.',
+      };
+    }
+
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) {
+      return {
+        success: false,
+        message: 'Client not found.',
+      };
+    }
+
+    let usedPackage: ClientPackage | undefined = undefined;
+    if (clientPackageId) {
+      usedPackage = clientPackages.find((cp) => cp.id === clientPackageId && cp.clientId === clientId);
+      if (!usedPackage) {
+        return {
+          success: false,
+          message: 'Selected package was not found.',
+        };
+      }
+      if (usedPackage.remainingSessions < 1) {
+        return {
+          success: false,
+          message: 'Insufficient sessions remaining on this package.',
+        };
+      }
+      if (usedPackage.expiresAt && usedPackage.expiresAt < gs.date) {
+        return {
+          success: false,
+          message: 'Selected package has expired.',
+        };
+      }
+    }
+
+    const apptId = `apt-grp-${Date.now()}-${clientId}`;
+    const price = usedPackage ? 0 : gs.price;
+
+    const newParticipant: GroupSessionParticipant = {
+      clientId,
+      clientName: client.name,
+      clientEmail: client.email,
+      clientPhone: client.phone,
+      bookedAt: new Date().toISOString(),
+      appointmentId: apptId,
+      packageId: usedPackage?.id,
+      packageName: usedPackage?.packageName,
+      price,
+      status: 'confirmed',
+    };
+
+    const newAppt: Appointment = {
+      id: apptId,
+      clientId,
+      serviceId: gs.serviceId || 'grp-service',
+      date: gs.date,
+      startTime: gs.startTime,
+      endTime: gs.endTime,
+      durationMinutes: gs.durationMinutes,
+      price,
+      status: 'reserved',
+      createdAt: formatDateISO(new Date()),
+      isGroupSession: true,
+      groupSessionId: gs.id,
+      groupSessionTitle: gs.title,
+      maxParticipants: gs.maxParticipants,
+      packageId: usedPackage?.id,
+      packageName: usedPackage?.packageName,
+      packageSessionsDeducted: usedPackage ? 1 : undefined,
+    };
+
+    // Deduct package credit if used
+    if (usedPackage) {
+      const remainingAfter = Math.max(0, Math.round((usedPackage.remainingSessions - 1) * 100) / 100);
+      setClientPackages((prev) =>
+        prev.map((cp) =>
+          cp.id === usedPackage!.id
+            ? {
+                ...cp,
+                remainingSessions: remainingAfter,
+                status: remainingAfter === 0 ? 'exhausted' : cp.status,
+              }
+            : cp
+        )
+      );
+    }
+
+    setAppointments((prev) => [newAppt, ...prev]);
+
+    setGroupSessions((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupSessionId) return g;
+        const filtered = (g.participants || []).filter((p) => p.clientId !== clientId);
+        return {
+          ...g,
+          participants: [...filtered, newParticipant],
+        };
+      })
+    );
+
+    const remainingSpots = Math.max(0, gs.maxParticipants - (confirmed.length + 1));
+
+    return {
+      success: true,
+      message: `Your spot for "${gs.title}" has been reserved! (${remainingSpots} ${remainingSpots === 1 ? 'spot' : 'spots'} left)`,
+      appointment: newAppt,
+    };
+  };
+
+  const cancelGroupSessionSpot = (
+    groupSessionId: string,
+    clientId: string,
+    reason?: string
+  ): { success: boolean; message: string } => {
+    const gs = groupSessions.find((g) => g.id === groupSessionId);
+    if (!gs) {
+      return {
+        success: false,
+        message: 'Group session not found.',
+      };
+    }
+
+    const participant = (gs.participants || []).find(
+      (p) => p.clientId === clientId && p.status === 'confirmed'
+    );
+    if (!participant) {
+      return {
+        success: false,
+        message: 'No active registration found.',
+      };
+    }
+
+    // Check cancellation cutoff
+    const check = isCancellationAllowed(
+      gs.date,
+      gs.startTime,
+      settings.cancellationPolicyHours,
+      settings.allowUnrestrictedCancellation
+    );
+
+    if (!check.allowed) {
+      return {
+        success: false,
+        message: `Cancellation cutoff expired (${settings.cancellationPolicyHours} hours policy). Please contact ${settings.name}.`,
+      };
+    }
+
+    // Restore package credit if used
+    if (participant.packageId) {
+      setClientPackages((prev) =>
+        prev.map((cp) => {
+          if (cp.id === participant.packageId) {
+            const restored = Math.round((cp.remainingSessions + 1) * 100) / 100;
+            return {
+              ...cp,
+              remainingSessions: restored,
+              status: restored > 0 ? 'active' : cp.status,
+            };
+          }
+          return cp;
+        })
+      );
+    }
+
+    // Cancel appointment
+    setAppointments((prev) =>
+      prev.map((a) =>
+        a.groupSessionId === groupSessionId && a.clientId === clientId
+          ? {
+              ...a,
+              status: 'cancelled' as AppointmentStatus,
+              cancelledAt: new Date().toISOString(),
+              cancellationReason: reason || 'Cancelled group session registration',
+            }
+          : a
+      )
+    );
+
+    // Update group session participant record
+    setGroupSessions((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupSessionId) return g;
+        return {
+          ...g,
+          participants: (g.participants || []).map((p) =>
+            p.clientId === clientId ? { ...p, status: 'cancelled' as const } : p
+          ),
+        };
+      })
+    );
+
+    return {
+      success: true,
+      message: 'Registration cancelled. The spot has been freed up.',
+    };
+  };
+
+  const isClientInGroupSession = (groupSessionId: string, clientId: string): boolean => {
+    const gs = groupSessions.find((g) => g.id === groupSessionId);
+    if (!gs || !gs.participants) return false;
+    return gs.participants.some((p) => p.clientId === clientId && p.status === 'confirmed');
+  };
+
+  const getGroupSessionSpotsLeft = (groupSessionId: string): number => {
+    const gs = groupSessions.find((g) => g.id === groupSessionId);
+    if (!gs) return 0;
+    const confirmedCount = (gs.participants || []).filter((p) => p.status === 'confirmed').length;
+    return Math.max(0, gs.maxParticipants - confirmedCount);
+  };
+
   // Invoicing & Billing management
   const updateBillingItemStatus = (
     type: 'appointment' | 'package',
@@ -2827,7 +3250,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const newMessages: ChatMessage[] = uniqueIds.map((cId, index) => {
       const clientObj = clients.find((c) => c.id === cId);
-      const fullName = clientObj?.name || (language === 'nl' ? 'Klant' : 'Client');
+      const fullName = clientObj?.name || 'Client';
       const firstName = fullName.split(' ')[0];
 
       const personalizedText = trimmed
@@ -3010,10 +3433,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       subtotal: -Math.abs(Number(originalInvoice.subtotal) || 0),
       totalVat: -Math.abs(Number(originalInvoice.totalVat) || 0),
       totalAmount: -Math.abs(Number(originalInvoice.totalAmount) || 0),
-      notes:
-        language === 'nl'
-          ? `Creditnota ter volledige tegenboeking van factuur ${originalInvoice.invoiceNumber}.`
-          : `Credit note reversing invoice ${originalInvoice.invoiceNumber} in full.`,
+      notes: `Credit note reversing invoice ${originalInvoice.invoiceNumber} in full.`,
       createdAt: new Date().toISOString(),
     };
 
@@ -3215,6 +3635,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       localStorage.setItem(`${prefix}_messages`, JSON.stringify(initialMessages));
       localStorage.setItem(`${prefix}_invoiceSettings`, JSON.stringify(restoredInvoiceSettings));
       localStorage.setItem(`${prefix}_invoices`, JSON.stringify(initialInvoices));
+      localStorage.setItem(`${prefix}_groupSessions`, JSON.stringify(initialGroupSessions));
     });
 
     prevSubcollectionsRef.current = {};
@@ -3226,6 +3647,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setMessages(initialMessages);
     setInvoiceSettings(restoredInvoiceSettings);
     setInvoices(initialInvoices);
+    setGroupSessions(initialGroupSessions);
     setSelectedChatClientId('cli-1');
     setRole('provider');
     setActiveClientId('cli-1');
@@ -3268,6 +3690,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       localStorage.setItem(`${prefix}_messages`, JSON.stringify([]));
       localStorage.setItem(`${prefix}_invoiceSettings`, JSON.stringify(cleanInvoiceSettings));
       localStorage.setItem(`${prefix}_invoices`, JSON.stringify([]));
+      localStorage.setItem(`${prefix}_groupSessions`, JSON.stringify([]));
     });
 
     prevSubcollectionsRef.current = {};
@@ -3279,6 +3702,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setMessages([]);
     setInvoiceSettings(cleanInvoiceSettings);
     setInvoices([]);
+    setGroupSessions([]);
     setSelectedChatClientId('');
     setActiveClientId('');
     setRole('provider');
@@ -3379,13 +3803,205 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const exportAllData = (): ProBookingBackupData => {
+    return {
+      version: 1,
+      app: 'ProBooking',
+      exportedAt: new Date().toISOString(),
+      language,
+      data: {
+        settings: JSON.parse(JSON.stringify(settings)),
+        invoiceSettings: JSON.parse(JSON.stringify(invoiceSettings)),
+        clients: JSON.parse(JSON.stringify(clients)),
+        appointments: JSON.parse(JSON.stringify(appointments)),
+        packages: JSON.parse(JSON.stringify(packages)),
+        clientPackages: JSON.parse(JSON.stringify(clientPackages)),
+        groupSessions: JSON.parse(JSON.stringify(groupSessions)),
+        invoices: JSON.parse(JSON.stringify(invoices)),
+        messages: JSON.parse(JSON.stringify(messages)),
+      },
+    };
+  };
+
+  const importAllData = (
+    backupInput: ProBookingBackupData | string,
+    mode: 'replace' | 'merge' = 'replace'
+  ): {
+    success: boolean;
+    message: string;
+    stats?: {
+      clientsCount: number;
+      appointmentsCount: number;
+      invoicesCount: number;
+      packagesCount: number;
+      groupSessionsCount: number;
+    };
+  } => {
+    try {
+      let parsed: any;
+      if (typeof backupInput === 'string') {
+        parsed = JSON.parse(backupInput);
+      } else {
+        parsed = backupInput;
+      }
+
+      if (!parsed || typeof parsed !== 'object') {
+        return {
+          success: false,
+          message: 'Invalid backup file (not a valid JSON object).',
+        };
+      }
+
+      // Handle structured { version: 1, data: { ... } } or direct payload
+      const backupData = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+
+      const incomingSettings = backupData.settings;
+      const incomingInvoiceSettings = backupData.invoiceSettings;
+      const incomingClients: Client[] = Array.isArray(backupData.clients) ? backupData.clients : [];
+      const incomingAppointments: Appointment[] = Array.isArray(backupData.appointments)
+        ? backupData.appointments
+        : [];
+      const incomingPackages: ServicePackage[] = Array.isArray(backupData.packages)
+        ? backupData.packages
+        : [];
+      const incomingClientPackages: ClientPackage[] = Array.isArray(backupData.clientPackages)
+        ? backupData.clientPackages
+        : [];
+      const incomingGroupSessions: GroupSession[] = Array.isArray(backupData.groupSessions)
+        ? backupData.groupSessions
+        : [];
+      const incomingInvoices: Invoice[] = Array.isArray(backupData.invoices)
+        ? backupData.invoices
+        : [];
+      const incomingMessages: ChatMessage[] = Array.isArray(backupData.messages)
+        ? backupData.messages
+        : [];
+
+      let finalSettings: ProviderSettings;
+      let finalInvoiceSettings: InvoiceSettings;
+      let finalClients: Client[];
+      let finalAppointments: Appointment[];
+      let finalPackages: ServicePackage[];
+      let finalClientPackages: ClientPackage[];
+      let finalGroupSessions: GroupSession[];
+      let finalInvoices: Invoice[];
+      let finalMessages: ChatMessage[];
+
+      if (mode === 'replace') {
+        finalSettings =
+          incomingSettings && typeof incomingSettings === 'object'
+            ? { ...initialSettings, ...incomingSettings }
+            : settings;
+
+        finalInvoiceSettings =
+          incomingInvoiceSettings && typeof incomingInvoiceSettings === 'object'
+            ? { ...initialInvoiceSettings, ...incomingInvoiceSettings }
+            : invoiceSettings;
+
+        finalClients = incomingClients;
+        finalAppointments = incomingAppointments;
+        finalPackages = incomingPackages;
+        finalClientPackages = incomingClientPackages;
+        finalGroupSessions = incomingGroupSessions;
+        finalInvoices = incomingInvoices;
+        finalMessages = incomingMessages;
+      } else {
+        // Merge mode
+        finalSettings =
+          incomingSettings && typeof incomingSettings === 'object'
+            ? { ...settings, ...incomingSettings }
+            : settings;
+
+        finalInvoiceSettings =
+          incomingInvoiceSettings && typeof incomingInvoiceSettings === 'object'
+            ? { ...invoiceSettings, ...incomingInvoiceSettings }
+            : invoiceSettings;
+
+        const mergeById = <T extends { id: string }>(currentList: T[], newList: T[]): T[] => {
+          const map = new Map<string, T>();
+          for (const item of currentList) {
+            if (item?.id) map.set(item.id, item);
+          }
+          for (const item of newList) {
+            if (item?.id) map.set(item.id, item);
+          }
+          return Array.from(map.values());
+        };
+
+        finalClients = mergeById(clients, incomingClients);
+        finalAppointments = mergeById(appointments, incomingAppointments);
+        finalPackages = mergeById(packages, incomingPackages);
+        finalClientPackages = mergeById(clientPackages, incomingClientPackages);
+        finalGroupSessions = mergeById(groupSessions, incomingGroupSessions);
+        finalInvoices = mergeById(invoices, incomingInvoices);
+        finalMessages = mergeById(messages, incomingMessages);
+      }
+
+      // Persist to local storage prefixes
+      const prefixes = [userStoragePrefix, LOCAL_STORAGE_KEY];
+      prefixes.forEach((prefix) => {
+        localStorage.setItem(`${prefix}_settings`, JSON.stringify(finalSettings));
+        localStorage.setItem(`${prefix}_invoiceSettings`, JSON.stringify(finalInvoiceSettings));
+        localStorage.setItem(`${prefix}_clients`, JSON.stringify(finalClients));
+        localStorage.setItem(`${prefix}_appointments`, JSON.stringify(finalAppointments));
+        localStorage.setItem(`${prefix}_packages`, JSON.stringify(finalPackages));
+        localStorage.setItem(`${prefix}_clientPackages`, JSON.stringify(finalClientPackages));
+        localStorage.setItem(`${prefix}_groupSessions`, JSON.stringify(finalGroupSessions));
+        localStorage.setItem(`${prefix}_invoices`, JSON.stringify(finalInvoices));
+        localStorage.setItem(`${prefix}_messages`, JSON.stringify(finalMessages));
+      });
+
+      localStorage.setItem('probooking_language', 'en');
+
+      // Atomically update React states
+      prevSubcollectionsRef.current = {};
+      setSettings(finalSettings);
+      setInvoiceSettings(finalInvoiceSettings);
+      setClients(finalClients);
+      setAppointments(finalAppointments);
+      setPackages(finalPackages);
+      setClientPackages(finalClientPackages);
+      setGroupSessions(finalGroupSessions);
+      setInvoices(finalInvoices);
+      setMessages(finalMessages);
+
+      if (
+        finalClients.length > 0 &&
+        (!activeClientId || !finalClients.some((c) => c.id === activeClientId))
+      ) {
+        setActiveClientId(finalClients[0].id);
+        setSelectedChatClientId(finalClients[0].id);
+      }
+
+      setSyncTrigger((prev) => prev + 1);
+
+      return {
+        success: true,
+        message: `Data successfully ${mode === 'replace' ? 'restored (replaced)' : 'merged'}!`,
+        stats: {
+          clientsCount: finalClients.length,
+          appointmentsCount: finalAppointments.length,
+          invoicesCount: finalInvoices.length,
+          packagesCount: finalPackages.length,
+          groupSessionsCount: finalGroupSessions.length,
+        },
+      };
+    } catch (err: any) {
+      console.error('Import error:', err);
+      return {
+        success: false,
+        message: err?.message || 'An error occurred while importing data.',
+      };
+    }
+  };
+
   const deleteTrainerAccount = async (reauthOptions?: {
     password?: string;
     provider?: 'google' | 'apple';
   }): Promise<void> => {
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('Geen ingelogde gebruiker gevonden.');
+      throw new Error('No authenticated user found.');
     }
 
     const uid = user.uid;
@@ -3604,6 +4220,14 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateAppointmentStatus,
         updateAppointment,
         deleteAppointment,
+        groupSessions,
+        addGroupSession,
+        updateGroupSession,
+        deleteGroupSession,
+        bookGroupSessionSpot,
+        cancelGroupSessionSpot,
+        isClientInGroupSession,
+        getGroupSessionSpotsLeft,
         updateBillingItemStatus,
         bulkUpdateBillingStatus,
         getBillingItems,
@@ -3623,6 +4247,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         setSelectedChatClientId,
         resetDemoData,
         clearDemoData,
+        exportAllData,
+        importAllData,
         currentClient,
         magicLinkNotification,
         dismissMagicLinkNotification,

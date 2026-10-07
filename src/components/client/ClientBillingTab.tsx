@@ -143,7 +143,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
               {formatPrice(stats.toInvoiceTotal)}
             </span>
             <span className="text-[11px] font-medium text-amber-700">
-              {language === 'nl' ? 'Nog te factureren' : 'To be invoiced'}
+              {'To be invoiced'}
             </span>
           </div>
         </div>
@@ -171,7 +171,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
               {formatPrice(stats.invoicedTotal)}
             </span>
             <span className="text-[11px] font-medium text-blue-700">
-              {language === 'nl' ? 'Openstaand' : 'Pending payment'}
+              {'Pending payment'}
             </span>
           </div>
         </div>
@@ -199,7 +199,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
               {formatPrice(stats.paidTotal)}
             </span>
             <span className="text-[11px] font-medium text-emerald-700">
-              {language === 'nl' ? 'Reeds voldaan' : 'Settled'}
+              {'Settled'}
             </span>
           </div>
         </div>
@@ -218,14 +218,12 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                   {t.clientPortalInvoices}
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  {language === 'nl'
-                    ? 'Officiële facturen met specificatie, BTW en IBAN-betaalinstructies.'
-                    : 'Official invoices with tax itemization, VAT and bank transfer instructions.'}
+                  {'Official invoices with tax itemization, VAT and bank transfer instructions.'}
                 </p>
               </div>
             </div>
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-              {clientInvoices.length} {language === 'nl' ? 'facturen' : 'invoices'}
+              {clientInvoices.length} {'invoices'}
             </span>
           </div>
 
@@ -248,13 +246,13 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                   <div className="text-xs">
                     <p className="font-semibold text-slate-800">
                       {inv.isCreditNote
-                        ? `${language === 'nl' ? 'Creditnota datum:' : 'Credit note date:'} ${inv.issueDate}`
-                        : `${language === 'nl' ? 'Factuurdatum:' : 'Issued:'} ${inv.issueDate} • ${language === 'nl' ? 'Vervalt:' : 'Due:'} ${inv.dueDate}`}
+                        ? `${'Credit note date:'} ${inv.issueDate}`
+                        : `${'Issued:'} ${inv.issueDate} • ${'Due:'} ${inv.dueDate}`}
                     </p>
                     <p className="text-[11px] text-slate-400">
                       {inv.isCreditNote && inv.originalInvoiceNumber
-                        ? `${language === 'nl' ? 'Tegenboeking van factuur' : 'Reversal of invoice'} ${inv.originalInvoiceNumber}`
-                        : `${inv.items?.length || 1} ${language === 'nl' ? 'dienst(en) gespecificeerd' : 'line item(s)'}`}
+                        ? `${'Reversal of invoice'} ${inv.originalInvoiceNumber}`
+                        : `${inv.items?.length || 1} ${'line item(s)'}`}
                     </p>
                   </div>
                 </div>
@@ -280,7 +278,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                     className="flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-bold transition cursor-pointer shadow-2xs"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    <span>{language === 'nl' ? 'Bekijk / PDF' : 'View / PDF'}</span>
+                    <span>{'View / PDF'}</span>
                   </button>
                 </div>
               </div>
@@ -339,7 +337,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
             onClick={() => setStatusFilter('all')}
             className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer whitespace-nowrap"
           >
-            {language === 'nl' ? 'Filter wissen' : 'Clear filter'}
+            {'Clear filter'}
           </button>
         )}
       </div>
@@ -347,7 +345,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
       {/* Delivered Sessions & Packages List */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          {language === 'nl' ? 'Geleverde Sessies & Pakketten' : 'Delivered Sessions & Packages'}
+          {'Delivered Sessions & Packages'}
         </h3>
 
         {filteredItems.length === 0 ? (
@@ -355,9 +353,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
             <Receipt className="mx-auto h-8 w-8 text-slate-300 mb-2" />
             <p className="font-semibold text-slate-700">{t.noBillingItems}</p>
             <p className="text-xs text-slate-400 mt-1">
-              {language === 'nl'
-                ? 'Zodra een sessie is voltooid of een pakket is gekocht, zie je die hier transparant overzichtelijk terug.'
-                : 'When a session completes or bundle is bought, it will be transparently itemized here.'}
+              {'When a session completes or bundle is bought, it will be transparently itemized here.'}
             </p>
           </div>
         ) : (
@@ -508,12 +504,10 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
         <HelpCircle className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
         <div className="space-y-0.5">
           <span className="font-bold text-slate-800">
-            {language === 'nl' ? 'Vragen over je facturen of sessietegoed?' : 'Questions regarding your billing or sessions?'}
+            {'Questions regarding your billing or sessions?'}
           </span>
           <p className="text-slate-500 leading-relaxed">
-            {language === 'nl'
-              ? 'Bij een strippenkaart of pakket wordt het bedrag van het pakket gefactureerd en worden de individuele sessies automatisch verrekend met je bundeltegoed. Neem gerust contact op via de directe chatlijn met je trainer.'
-              : 'For packages, the total bundle price is billed, and individual sessions are credited against your balance. Feel free to contact your trainer via the direct chat tab.'}
+            {'For packages, the total bundle price is billed, and individual sessions are credited against your balance. Feel free to contact your trainer via the direct chat tab.'}
           </p>
         </div>
       </div>

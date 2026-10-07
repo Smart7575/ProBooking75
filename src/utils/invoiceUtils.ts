@@ -396,7 +396,7 @@ export function isDemoTrainerName(name: string | undefined | null, currentEmail?
 
 export function getLocalizedInvoiceNote(
   note: string | undefined | null,
-  language: 'en' | 'nl',
+  language?: string,
   businessName?: string
 ): string {
   if (!note) return '';
@@ -411,38 +411,19 @@ export function getLocalizedInvoiceNote(
     trimmed = trimmed.replace(/Alex Jansen Coaching/g, cleanBizName);
   }
 
-  // If language is English, translate known Dutch default boilerplate notes
-  if (language === 'en') {
-    if (
-      trimmed.includes('Gelieve het factuurnummer te vermelden bij de betaling')
-    ) {
-      return cleanBizName
-        ? `Please quote the invoice number when making the payment. Thank you for your trust in ${cleanBizName}!`
-        : 'Please quote the invoice number when making the payment. Thank you for your trust!';
-    }
-    if (
-      trimmed === 'Gelieve het factuurnummer te vermelden bij de overschrijving.' ||
-      trimmed.includes('Gelieve het factuurnummer te vermelden bij de overschrijving')
-    ) {
-      return 'Please quote the invoice number when making the bank transfer.';
-    }
+  // Translate known Dutch default boilerplate notes to English
+  if (
+    trimmed.includes('Gelieve het factuurnummer te vermelden bij de betaling')
+  ) {
+    return cleanBizName
+      ? `Please quote the invoice number when making the payment. Thank you for your trust in ${cleanBizName}!`
+      : 'Please quote the invoice number when making the payment. Thank you for your trust!';
   }
-
-  // If language is Dutch, translate known English default boilerplate notes
-  if (language === 'nl') {
-    if (
-      trimmed.includes('Please quote the invoice number when making the payment')
-    ) {
-      return cleanBizName
-        ? `Gelieve het factuurnummer te vermelden bij de betaling. Hartelijk dank voor het vertrouwen in ${cleanBizName}!`
-        : 'Gelieve het factuurnummer te vermelden bij de betaling. Hartelijk dank voor het vertrouwen!';
-    }
-    if (
-      trimmed === 'Please quote the invoice number when making the bank transfer.' ||
-      trimmed.includes('Please quote the invoice number when making the bank transfer')
-    ) {
-      return 'Gelieve het factuurnummer te vermelden bij de overschrijving.';
-    }
+  if (
+    trimmed === 'Gelieve het factuurnummer te vermelden bij de overschrijving.' ||
+    trimmed.includes('Gelieve het factuurnummer te vermelden bij de overschrijving')
+  ) {
+    return 'Please quote the invoice number when making the bank transfer.';
   }
 
   return trimmed;

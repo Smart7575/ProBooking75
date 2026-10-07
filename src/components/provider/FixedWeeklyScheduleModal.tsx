@@ -6,8 +6,6 @@ import {
   Clock,
   Check,
   Coffee,
-  Sparkles,
-  ArrowRight,
   AlertCircle,
   CalendarRange,
 } from 'lucide-react';
@@ -16,7 +14,6 @@ import {
   getTodayISO,
   addDaysToISO,
   parseDateISO,
-  formatDateISO,
   addDays,
   formatHumanDate,
   timeToMinutes,
@@ -30,13 +27,13 @@ interface FixedWeeklyScheduleModalProps {
 }
 
 const DAYS_OF_WEEK = [
-  { index: 1, labelNl: 'Maandag', labelEn: 'Monday', shortNl: 'Ma', shortEn: 'Mon' },
-  { index: 2, labelNl: 'Dinsdag', labelEn: 'Tuesday', shortNl: 'Di', shortEn: 'Tue' },
-  { index: 3, labelNl: 'Woensdag', labelEn: 'Wednesday', shortNl: 'Wo', shortEn: 'Wed' },
-  { index: 4, labelNl: 'Donderdag', labelEn: 'Thursday', shortNl: 'Do', shortEn: 'Thu' },
-  { index: 5, labelNl: 'Vrijdag', labelEn: 'Friday', shortNl: 'Vr', shortEn: 'Fri' },
-  { index: 6, labelNl: 'Zaterdag', labelEn: 'Saturday', shortNl: 'Za', shortEn: 'Sat' },
-  { index: 0, labelNl: 'Zondag', labelEn: 'Sunday', shortNl: 'Zo', shortEn: 'Sun' },
+  { index: 1, label: 'Monday', short: 'Mon' },
+  { index: 2, label: 'Tuesday', short: 'Tue' },
+  { index: 3, label: 'Wednesday', short: 'Wed' },
+  { index: 4, label: 'Thursday', short: 'Thu' },
+  { index: 5, label: 'Friday', short: 'Fri' },
+  { index: 6, label: 'Saturday', short: 'Sat' },
+  { index: 0, label: 'Sunday', short: 'Sun' },
 ];
 
 export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> = ({
@@ -44,8 +41,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
   onClose,
   initialStartDate,
 }) => {
-  const { settings, applyWeeklyScheduleToDateRange, language } = useBooking();
-  const isNl = language === 'nl';
+  const { settings, applyWeeklyScheduleToDateRange } = useBooking();
 
   const todayStr = getTodayISO();
   const [startDate, setStartDate] = useState<string>(initialStartDate || todayStr);
@@ -133,30 +129,18 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
     setErrorMsg('');
 
     if (!startDate || !endDate) {
-      setErrorMsg(
-        isNl
-          ? 'Selecteer zowel een startdatum als een einddatum.'
-          : 'Please select both a start date and an end date.'
-      );
+      setErrorMsg('Please select both a start date and an end date.');
       return;
     }
 
     if (startDate > endDate) {
-      setErrorMsg(
-        isNl
-          ? 'De startdatum mag niet na de einddatum liggen.'
-          : 'Start date cannot be after the end date.'
-      );
+      setErrorMsg('Start date cannot be after the end date.');
       return;
     }
 
     const enabledDays = scheduleDraft.filter((d) => d.enabled);
     if (enabledDays.length === 0) {
-      setErrorMsg(
-        isNl
-          ? 'Selecteer minimaal één werkdag in het weekrooster.'
-          : 'Please enable at least one workday in the weekly schedule.'
-      );
+      setErrorMsg('Please enable at least one workday in the weekly schedule.');
       return;
     }
 
@@ -165,11 +149,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
       const eMin = endTimeToMinutes(d.endTime);
       if (eMin <= sMin) {
         const dayInfo = DAYS_OF_WEEK.find((item) => item.index === d.dayOfWeek);
-        setErrorMsg(
-          isNl
-            ? `Eindtijd moet na starttijd liggen op ${dayInfo?.labelNl || 'werkdag'}.`
-            : `End time must be after start time on ${dayInfo?.labelEn || 'workday'}.`
-        );
+        setErrorMsg(`End time must be after start time on ${dayInfo?.label || 'workday'}.`);
         return;
       }
     }
@@ -182,9 +162,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
     );
 
     setSuccessMsg(
-      isNl
-        ? `Vast weekrooster toegepast van ${formatHumanDate(startDate)} t/m ${formatHumanDate(endDate)} (${appliedCount} werkdagen ingepland op de kalender)!`
-        : `Fixed weekly schedule applied from ${formatHumanDate(startDate)} to ${formatHumanDate(endDate)} (${appliedCount} workdays scheduled on the calendar)!`
+      `Fixed weekly schedule applied from ${formatHumanDate(startDate)} to ${formatHumanDate(endDate)} (${appliedCount} workdays scheduled on the calendar)!`
     );
 
     setTimeout(() => {
@@ -204,18 +182,14 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  {isNl
-                    ? 'Vast Weekrooster Toepassen op Periode'
-                    : 'Apply Fixed Weekly Schedule to Date Range'}
+                  Apply Fixed Weekly Schedule to Date Range
                 </h3>
                 <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
                   Fixed Schedule
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5 font-medium">
-                {isNl
-                  ? 'Kies vanaf welke startdatum tot en met welke einddatum je dit vaste weekrooster wilt hanteren'
-                  : 'Select the exact start date and end date for applying your fixed weekly schedule'}
+                Select the exact start date and end date for applying your fixed weekly schedule
               </p>
             </div>
           </div>
@@ -244,17 +218,16 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
             </div>
           )}
 
-          {/* STEP 1: Date Range Picker (Startdatum t/m Einddatum) */}
+          {/* STEP 1: Date Range Picker */}
           <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-50/40 p-4 sm:p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
                 <CalendarIcon className="h-4 w-4 text-emerald-600" />
-                {isNl ? '1. Kies Periode (Startdatum t/m Einddatum)' : '1. Select Date Range (Start Date to End Date)'}
+                1. Select Date Range (Start Date to End Date)
               </span>
               {periodStats.totalDays > 0 && (
                 <span className="text-xs font-bold text-emerald-900 bg-emerald-200/80 px-2.5 py-1 rounded-lg">
-                  {periodStats.workDaysCount} {isNl ? 'werkdagen in' : 'workdays across'} {periodStats.totalDays}{' '}
-                  {isNl ? 'dagen' : 'days'}
+                  {periodStats.workDaysCount} workdays across {periodStats.totalDays} days
                 </span>
               )}
             </div>
@@ -262,7 +235,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-emerald-200 p-3 shadow-2xs">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                  {isNl ? 'Vanaf Startdatum' : 'Start Date (From)'}
+                  Start Date (From)
                 </label>
                 <input
                   type="date"
@@ -284,7 +257,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
 
               <div className="bg-white rounded-xl border border-emerald-200 p-3 shadow-2xs">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                  {isNl ? 'Tot en met Einddatum' : 'End Date (Up to & including)'}
+                  End Date (Up to &amp; including)
                 </label>
                 <input
                   type="date"
@@ -303,16 +276,16 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
             {/* Quick Period Presets */}
             <div>
               <span className="block text-[11px] font-bold text-slate-600 mb-1.5">
-                {isNl ? 'Snel periode kiezen (vanaf startdatum):' : 'Quick range (from start date):'}
+                Quick range (from start date):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { labelNl: '1 week (7d)', labelEn: '1 week (7d)', days: 6 },
-                  { labelNl: '2 weken (14d)', labelEn: '2 weeks (14d)', days: 13 },
-                  { labelNl: '4 weken (1 mnd)', labelEn: '4 weeks (1 mo)', days: 27 },
-                  { labelNl: '2 maanden', labelEn: '2 months', days: 60 },
-                  { labelNl: '3 maanden (Kwartaal)', labelEn: '3 months (Quarter)', days: 90 },
-                  { labelNl: '6 maanden (Halfjaar)', labelEn: '6 months', days: 180 },
+                  { label: '1 week (7d)', days: 6 },
+                  { label: '2 weeks (14d)', days: 13 },
+                  { label: '4 weeks (1 mo)', days: 27 },
+                  { label: '2 months', days: 60 },
+                  { label: '3 months (Quarter)', days: 90 },
+                  { label: '6 months', days: 180 },
                 ].map((preset) => (
                   <button
                     key={preset.days}
@@ -320,7 +293,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
                     onClick={() => handleQuickRange(preset.days)}
                     className="rounded-lg bg-white border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 transition shadow-2xs cursor-pointer"
                   >
-                    {isNl ? preset.labelNl : preset.labelEn}
+                    {preset.label}
                   </button>
                 ))}
               </div>
@@ -333,12 +306,10 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Clock className="h-4 w-4 text-emerald-600" />
-                  {isNl ? '2. Vast Weekrooster (Maandag t/m Zondag)' : '2. Fixed Weekly Schedule (Monday - Sunday)'}
+                  2. Fixed Weekly Schedule (Monday - Sunday)
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {isNl
-                    ? 'Vink de vaste werkdagen aan en stel je werktijden en optionele pauze in.'
-                    : 'Check your recurring workdays and configure working hours and optional break.'}
+                  Check your recurring workdays and configure working hours and optional break.
                 </p>
               </div>
             </div>
@@ -369,7 +340,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
                           dayConfig.enabled ? 'text-slate-900' : 'text-slate-400'
                         }`}
                       >
-                        {isNl ? dayInfo.labelNl : dayInfo.labelEn}
+                        {dayInfo.label}
                       </span>
                     </label>
 
@@ -377,7 +348,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
                       <div className="flex flex-wrap items-center gap-2.5">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] text-slate-500 font-semibold">
-                            {isNl ? 'Werktijd:' : 'Hours:'}
+                            Hours:
                           </span>
                           <input
                             type="time"
@@ -401,7 +372,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
                         <div className="flex items-center gap-1.5 sm:border-l sm:border-slate-200 sm:pl-2.5">
                           <Coffee className="h-3.5 w-3.5 text-purple-600 shrink-0" />
                           <span className="text-[11px] text-slate-500 font-semibold">
-                            {isNl ? 'Pauze:' : 'Break:'}
+                            Break:
                           </span>
                           <input
                             type="time"
@@ -424,7 +395,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
                       </div>
                     ) : (
                       <span className="text-xs text-slate-400 italic">
-                        {isNl ? 'Vrij / Gesloten' : 'Closed / Off'}
+                        Closed / Off
                       </span>
                     )}
                   </div>
@@ -444,14 +415,10 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
               />
               <div>
                 <span className="text-xs font-bold text-slate-900 block">
-                  {isNl
-                    ? 'Bestaande ad-hoc werktijden in deze periode vervangen door dit weekrooster'
-                    : 'Replace existing ad-hoc working hours in this date range with this weekly schedule'}
+                  Replace existing ad-hoc working hours in this date range with this weekly schedule
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-0.5">
-                  {isNl
-                    ? 'Uitvinken als je alleen nog lege dagen binnen de gekozen periode wilt opvullen. Na toepassing kun je elke dag op de kalender nog ad-hoc aanpassen.'
-                    : 'Uncheck to only fill empty dates in the selected period. You can still customize any individual date ad-hoc afterwards.'}
+                  Uncheck to only fill empty dates in the selected period. You can still customize any individual date ad-hoc afterwards.
                 </span>
               </div>
             </label>
@@ -461,9 +428,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
         {/* Footer */}
         <div className="border-t border-slate-100 bg-slate-50/80 px-6 py-4 flex items-center justify-between gap-3 shrink-0">
           <div className="text-[11px] text-slate-500 font-medium hidden sm:block">
-            {isNl
-              ? 'Standaard blijft Ad Hoc planning actief zodat je elke dag vrij kunt aanpassen.'
-              : 'Ad Hoc planning remains active by default so you can adjust any date freely.'}
+            Ad Hoc planning remains active by default so you can adjust any date freely.
           </div>
           <div className="flex items-center gap-2.5 ml-auto">
             <button
@@ -471,7 +436,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
               onClick={onClose}
               className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
             >
-              {isNl ? 'Annuleren' : 'Cancel'}
+              Cancel
             </button>
             <button
               type="button"
@@ -480,9 +445,7 @@ export const FixedWeeklyScheduleModal: React.FC<FixedWeeklyScheduleModalProps> =
             >
               <Check className="h-4 w-4" />
               <span>
-                {isNl
-                  ? 'Vast Weekrooster Toepassen'
-                  : 'Apply Fixed Weekly Schedule'}
+                Apply Fixed Weekly Schedule
               </span>
             </button>
           </div>

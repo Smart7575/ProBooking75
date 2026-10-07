@@ -22,6 +22,9 @@ import {
   parseDateISO,
 } from '../../utils/dateUtils';
 import { Appointment, AppointmentStatus } from '../../types';
+import { MonthlyRevenueDashboard } from './MonthlyRevenueDashboard';
+import { SessionTypeRevenueChart } from './SessionTypeRevenueChart';
+import { ClientRevenueChart } from './ClientRevenueChart';
 
 export const ReportingView: React.FC = () => {
   const { appointments, clients, settings, currency, formatPrice, t } = useBooking();
@@ -349,6 +352,46 @@ export const ReportingView: React.FC = () => {
             Within policy or provider cancelled
           </p>
         </div>
+      </div>
+
+      {/* Recharts Monthly Revenue Trends Dashboard (Gross / Net / Tax Views) */}
+      <MonthlyRevenueDashboard
+        selectedClientId={clientFilter}
+        onClearClientFilter={() => setClientFilter('all')}
+      />
+
+      {/* Revenue Breakdown by Session Type & Client */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SessionTypeRevenueChart
+          periodRange={periodRange}
+          periodLabel={
+            periodFilter === 'today'
+              ? t.rangeToday
+              : periodFilter === 'week'
+              ? t.rangeThisWeek
+              : periodFilter === 'month'
+              ? t.rangeThisMonth
+              : periodFilter === 'year'
+              ? t.rangeThisYear
+              : t.rangeAll
+          }
+        />
+        <ClientRevenueChart
+          periodRange={periodRange}
+          periodLabel={
+            periodFilter === 'today'
+              ? t.rangeToday
+              : periodFilter === 'week'
+              ? t.rangeThisWeek
+              : periodFilter === 'month'
+              ? t.rangeThisMonth
+              : periodFilter === 'year'
+              ? t.rangeThisYear
+              : t.rangeAll
+          }
+          selectedClientId={clientFilter}
+          onSelectClient={(cId) => setClientFilter(cId)}
+        />
       </div>
 
       {/* Visual Analytics / Distribution Card */}

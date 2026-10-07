@@ -166,9 +166,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
     const clientIds = new Set(selectedItems.map((i) => i.clientId));
     if (clientIds.size > 1) {
       setSelectionNotice(
-        language === 'nl'
-          ? 'Je hebt items van meerdere verschillende klanten geselecteerd. Selecteer items van 1 klant om een verzamelfactuur aan te maken (of filter eerst op klant).'
-          : 'Selected items belong to multiple clients. Please select items from a single client to generate a collective invoice.'
+        'Selected items belong to multiple clients. Please select items from a single client to generate a collective invoice.'
       );
       return;
     }
@@ -233,21 +231,21 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
   // Export to CSV
   const handleExportCSV = () => {
     const headers = [
-      language === 'nl' ? 'Datum' : 'Date',
-      language === 'nl' ? 'Klant' : 'Client',
-      language === 'nl' ? 'Type' : 'Type',
-      language === 'nl' ? 'Omschrijving' : 'Description',
-      language === 'nl' ? 'Bedrag' : 'Amount',
-      language === 'nl' ? 'Status' : 'Status',
-      language === 'nl' ? 'Factuurnummer' : 'Invoice Number',
-      language === 'nl' ? 'Factuurdatum' : 'Invoice Date',
-      language === 'nl' ? 'Betaaldatum' : 'Payment Date',
+      'Date',
+      'Client',
+      'Type',
+      'Description',
+      'Amount',
+      'Status',
+      'Invoice Number',
+      'Invoice Date',
+      'Payment Date',
     ];
 
     const rows = filteredItems.map((item) => [
       item.date,
       `"${item.clientName}"`,
-      item.type === 'package' ? (language === 'nl' ? 'Pakket' : 'Package') : (language === 'nl' ? 'Sessie' : 'Session'),
+      item.type === 'package' ? ('Package') : ('Session'),
       `"${item.title} - ${item.description || ''}"`,
       item.amount.toFixed(2),
       item.status,
@@ -263,7 +261,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `facturatie-overzicht-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `billing-overview-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -297,8 +295,8 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   }`}
                   title={
                     invoiceSettings.enabled
-                      ? (language === 'nl' ? 'Factuurmodule actief - klik voor instellingen' : 'Invoice module active - click for settings')
-                      : (language === 'nl' ? 'Factuurmodule uitgeschakeld - klik om in te schakelen' : 'Invoice module disabled - click to enable')
+                      ? ('Invoice module active - click for settings')
+                      : ('Invoice module disabled - click to enable')
                   }
                 >
                   <span
@@ -308,8 +306,8 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   ></span>
                   <span>
                     {invoiceSettings.enabled
-                      ? (language === 'nl' ? 'Factuurmodule: Actief' : 'Invoicing: Active')
-                      : (language === 'nl' ? 'Factuurmodule: Uit' : 'Invoicing: Disabled')}
+                      ? ('Invoicing: Active')
+                      : ('Invoicing: Disabled')}
                   </span>
                 </span>
               </div>
@@ -406,7 +404,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
           <span>{t.tabBillingSettings}</span>
           {!invoiceSettings.enabled && (
             <span className="rounded-full bg-slate-200 text-slate-700 px-1.5 py-0.2 text-[10px]">
-              {language === 'nl' ? 'Uit' : 'Off'}
+              {'Off'}
             </span>
           )}
         </button>
@@ -419,14 +417,10 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
             <Power className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-slate-900">
-                {language === 'nl'
-                  ? 'Factuurmodule is momenteel uitgeschakeld'
-                  : 'Invoicing Module is currently disabled'}
+                {'Invoicing Module is currently disabled'}
               </span>
               <p className="text-slate-600 mt-0.5">
-                {language === 'nl'
-                  ? 'Je kunt voltooide sessies en gekochte pakketten hieronder blijven bijhouden en handmatig markeren. Wil je officiële opvolgende factuurnummers en PDF facturen genereren?'
-                  : 'You can continue tracking delivered sessions and packages. Would you like to issue sequential official invoices and PDFs?'}
+                {'You can continue tracking delivered sessions and packages. Would you like to issue sequential official invoices and PDFs?'}
               </p>
             </div>
           </div>
@@ -467,7 +461,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   {formatPrice(stats.toInvoiceTotal)}
                 </span>
                 <span className="text-[11px] font-medium text-amber-700">
-                  {language === 'nl' ? 'Nog te verzenden' : 'Awaiting invoice'}
+                  {'Awaiting invoice'}
                 </span>
               </div>
             </div>
@@ -495,7 +489,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   {formatPrice(stats.invoicedTotal)}
                 </span>
                 <span className="text-[11px] font-medium text-blue-700">
-                  {language === 'nl' ? 'Wacht op betaling' : 'Awaiting payment'}
+                  {'Awaiting payment'}
                 </span>
               </div>
             </div>
@@ -523,7 +517,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   {formatPrice(stats.paidTotal)}
                 </span>
                 <span className="text-[11px] font-medium text-emerald-700">
-                  {language === 'nl' ? 'Reeds ontvangen' : 'Settled'}
+                  {'Settled'}
                 </span>
               </div>
             </div>
@@ -602,7 +596,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                   <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder={language === 'nl' ? 'Zoek klant, factuurnr, dienst...' : 'Search client, invoice #, service...'}
+                    placeholder={'Search client, invoice #, service...'}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8.5 pr-3 text-xs text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none transition"
@@ -681,7 +675,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                     }}
                     className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                   >
-                    {language === 'nl' ? 'Deselecteren' : 'Deselect'}
+                    {'Deselect'}
                   </button>
                 </div>
               </div>
@@ -704,7 +698,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                     </th>
                     <th className="py-3 px-3">{t.date}</th>
                     <th className="py-3 px-3">{t.client}</th>
-                    <th className="py-3 px-3">{language === 'nl' ? 'Type & Omschrijving' : 'Type & Description'}</th>
+                    <th className="py-3 px-3">{'Type & Description'}</th>
                     <th className="py-3 px-3 text-right">{t.price}</th>
                     <th className="py-3 px-3">{t.status}</th>
                     <th className="py-3 px-3">{t.invoiceNumber}</th>
@@ -718,9 +712,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                         <Receipt className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                         <p className="font-medium">{t.noBillingItems}</p>
                         <p className="text-[11px] text-slate-400 mt-1">
-                          {language === 'nl'
-                            ? 'Zodra een afspraak voltooid is of een pakket wordt gekocht, verschijnt deze automatisch hier.'
-                            : 'Completed appointments and purchased packages will automatically appear here.'}
+                          {'Completed appointments and purchased packages will automatically appear here.'}
                         </p>
                       </td>
                     </tr>
@@ -759,7 +751,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                               <button
                                 onClick={() => setSelectedClientId(item.clientId)}
                                 className="font-bold text-slate-900 hover:text-emerald-600 transition text-left cursor-pointer"
-                                title={language === 'nl' ? `Filter op ${item.clientName}` : `Filter by ${item.clientName}`}
+                                title={`Filter by ${item.clientName}`}
                               >
                                 {item.clientName}
                               </button>
@@ -818,19 +810,11 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                                 <span className="text-[10px] font-medium text-slate-500">
                                   {!(invoiceSettings.taxId && invoiceSettings.taxId.trim()) ||
                                   invoiceSettings.isVatExempt
-                                    ? language === 'nl'
-                                      ? 'vrijgesteld van BTW'
-                                      : 'VAT exempt'
+                                    ? 'VAT exempt'
                                     : (invoiceSettings.defaultVatRate ?? 21) === 0
-                                    ? language === 'nl'
-                                      ? '0% BTW'
-                                      : '0% VAT'
+                                    ? '0% VAT'
                                     : (item.isVatInclusive ?? true)
-                                    ? language === 'nl'
-                                      ? 'incl. BTW'
-                                      : 'incl. VAT'
-                                    : language === 'nl'
-                                    ? 'excl. BTW'
+                                    ? 'incl. VAT'
                                     : 'excl. VAT'}
                                   {Boolean(invoiceSettings.taxId && invoiceSettings.taxId.trim()) &&
                                     !(item.isVatInclusive ?? true) &&
@@ -878,7 +862,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                                   <button
                                     onClick={() => setPdfModalInvoice(matchingInvoice)}
                                     className="font-mono text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition cursor-pointer flex items-center gap-1"
-                                    title={language === 'nl' ? 'Bekijk officiële PDF factuur' : 'View official PDF invoice'}
+                                    title={'View official PDF invoice'}
                                   >
                                     <FileText className="h-3 w-3 text-blue-500" />
                                     <span>{item.invoiceNumber}</span>
@@ -912,8 +896,8 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                                   title={invoiceSettings.enabled ? t.generateInvoice : t.markAsInvoiced}
                                 >
                                   {invoiceSettings.enabled
-                                    ? (language === 'nl' ? 'Factuur maken' : 'Invoice')
-                                    : (language === 'nl' ? 'Factureren' : 'Invoice')}
+                                    ? ('Invoice')
+                                    : ('Invoice')}
                                 </button>
                               )}
 
@@ -925,7 +909,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                                   className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-2xs hover:bg-emerald-700 transition cursor-pointer"
                                   title={t.markAsPaid}
                                 >
-                                  {language === 'nl' ? 'Voldaan' : 'Paid'}
+                                  {'Paid'}
                                 </button>
                               )}
 
@@ -933,7 +917,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                               <div className="relative group">
                                 <button
                                   className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
-                                  title={language === 'nl' ? 'Status wijzigen' : 'Change status'}
+                                  title={'Change status'}
                                 >
                                   <ArrowUpDown className="h-3 w-3" />
                                 </button>
@@ -1125,9 +1109,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-              {language === 'nl'
-                ? 'Voer een factuurnummer in om aan alle geselecteerde posten toe te wijzen (of laat leeg):'
-                : 'Enter an invoice reference number for all selected items (or leave empty):'}
+              {'Enter an invoice reference number for all selected items (or leave empty):'}
             </p>
 
             <div className="space-y-3 mb-6">

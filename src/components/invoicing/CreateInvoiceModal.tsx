@@ -268,7 +268,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         setItems([
           {
             id: `line-${Date.now()}`,
-            description: language === 'nl' ? 'Personal Training Sessie' : 'Personal Training Session',
+            description: 'Personal Training Session',
             quantity: 1,
             baseAmount: defaultBase,
             isVatInclusive: isIncl,
@@ -467,9 +467,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 {t.invoiceModalTitle}
               </h3>
               <p className="text-xs text-slate-500">
-                {language === 'nl'
-                  ? 'Maak een opvolgend genummerde, internationaal conforme factuur'
-                  : 'Generate a sequential, legally compliant invoice'}
+                {'Generate a sequential, legally compliant invoice'}
               </p>
             </div>
           </div>
@@ -554,12 +552,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                {language === 'nl' ? 'Factuurregels' : 'Invoice Line Items'}
+                {'Invoice Line Items'}
               </label>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1">
                   <span className="text-[11px] font-bold text-slate-600">
-                    {language === 'nl' ? 'Tarief is:' : 'Rate is:'}
+                    {'Rate is:'}
                   </span>
                   <label className="inline-flex items-center gap-1 cursor-pointer select-none">
                     <input
@@ -573,7 +571,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         !ratesIncludeVatMode ? 'text-emerald-700' : 'text-slate-600'
                       }`}
                     >
-                      {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                      {'Excl. VAT'}
                     </span>
                   </label>
                   <label className="inline-flex items-center gap-1 cursor-pointer select-none">
@@ -588,7 +586,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         ratesIncludeVatMode ? 'text-emerald-700' : 'text-slate-600'
                       }`}
                     >
-                      {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                      {'Incl. VAT'}
                     </span>
                   </label>
                 </div>
@@ -607,16 +605,14 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             {!hasTaxId ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-900 flex items-center justify-between gap-2">
                 <span className="font-bold">
-                  {language === 'nl'
-                    ? 'BTW-regime: Vrijgesteld van BTW (0%) — Er is geen BTW-nummer ingesteld, dus er kan geen BTW worden berekend.'
-                    : 'VAT regime: Exempt from VAT (0%) — No VAT ID is configured, so no VAT can be charged.'}
+                  {'VAT regime: Exempt from VAT (0%) — No VAT ID is configured, so no VAT can be charged.'}
                 </span>
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-bold text-slate-600 mr-1">
-                    {language === 'nl' ? 'BTW-tarieven:' : 'VAT rates:'}
+                    {'VAT rates:'}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/60 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
                     <button
@@ -640,12 +636,10 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       }}
                       className="cursor-pointer hover:text-emerald-950 transition"
                       title={
-                        language === 'nl'
-                          ? 'Pas Vrijgesteld van BTW toe op alle regels'
-                          : 'Apply Exempt from VAT to all lines'
+                        'Apply Exempt from VAT to all lines'
                       }
                     >
-                      {language === 'nl' ? 'Vrijgesteld van BTW' : 'Exempt from VAT'}
+                      {'Exempt from VAT'}
                     </button>
                   </span>
                   {availableVatRates.map((rate) => (
@@ -674,9 +668,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         }}
                         className="cursor-pointer hover:text-blue-600 transition"
                         title={
-                          language === 'nl'
-                            ? `Pas ${rate}% BTW toe op alle regels`
-                            : `Apply ${rate}% VAT to all lines`
+                          `Apply ${rate}% VAT to all lines`
                         }
                       >
                         {`${rate}% BTW`}
@@ -687,9 +679,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                           onClick={() => handleDeleteVatRate(rate)}
                           className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition cursor-pointer"
                           title={
-                            language === 'nl'
-                              ? `BTW-tarief ${rate}% verwijderen`
-                              : `Remove ${rate}% VAT rate`
+                            `Remove ${rate}% VAT rate`
                           }
                         >
                           <X className="h-2.5 w-2.5" />
@@ -714,7 +704,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                           handleAddCustomVatRate();
                         }
                       }}
-                      placeholder={language === 'nl' ? 'Eigen BTW %' : 'Custom VAT %'}
+                      placeholder={'Custom VAT %'}
                       className="w-28 rounded-lg border border-slate-200 bg-white pl-2 pr-5 py-1 text-[11px] font-mono font-bold text-slate-900 focus:border-blue-500 outline-none"
                     />
                     <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
@@ -728,7 +718,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     className="flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 px-2.5 py-1 text-[11px] font-bold text-white transition cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
-                    <span>{language === 'nl' ? 'Toevoegen' : 'Add'}</span>
+                    <span>{'Add'}</span>
                   </button>
                 </div>
               </div>
@@ -794,15 +784,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-1.5 pl-2 pr-6 text-xs text-center font-medium text-slate-900 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <option value="exempt">
-                          {language === 'nl' ? 'Vrijgesteld van BTW' : 'Exempt from VAT'}
+                          {'Exempt from VAT'}
                         </option>
                         {hasTaxId &&
                           availableVatRates.map((rate) => (
                             <option key={rate} value={String(rate)}>
                               {rate === 0
-                                ? language === 'nl'
-                                  ? '0% BTW'
-                                  : '0% VAT'
+                                ? '0% VAT'
                                 : `${rate}% BTW`}
                             </option>
                           ))}
@@ -835,17 +823,17 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 {t.billFrom}: <strong className="text-slate-800">{effectiveSenderName}</strong>
               </p>
               <p>
-                {language === 'nl' ? 'KVK:' : 'CoC:'}{' '}
+                {'CoC:'}{' '}
                 <strong className="text-slate-800 font-mono">
                   {(invoiceSettings.chamberOfCommerce || '').trim() ||
-                    (language === 'nl' ? 'Niet van toepassing' : 'Not applicable')}
+                    ('Not applicable')}
                 </strong>
               </p>
               <p>
-                {language === 'nl' ? 'BTW-ID:' : 'VAT ID:'}{' '}
+                {'VAT ID:'}{' '}
                 <strong className="text-slate-800 font-mono">
                   {(invoiceSettings.taxId || '').trim() ||
-                    (language === 'nl' ? 'Niet van toepassing' : 'Not applicable')}
+                    ('Not applicable')}
                 </strong>
               </p>
               <p>
@@ -863,7 +851,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 <span className="font-semibold text-slate-800">
                   {isAllExempt ? (
                     <span className="text-emerald-700 font-bold">
-                      {language === 'nl' ? 'Vrijgesteld' : 'Exempt'}
+                      {'Exempt'}
                     </span>
                   ) : (
                     formatPrice(totals.totalVat)
@@ -873,9 +861,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               <div className="flex justify-between pt-1 border-t border-slate-200 text-sm font-extrabold text-slate-900">
                 <span>
                   {isAllExempt
-                    ? language === 'nl'
-                      ? 'Totaalbedrag (Vrijgesteld van BTW)'
-                      : 'Total (Exempt from VAT)'
+                    ? 'Total (Exempt from VAT)'
                     : t.totalInclVat}
                   :
                 </span>

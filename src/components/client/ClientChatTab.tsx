@@ -66,12 +66,7 @@ export const ClientChatTab: React.FC = () => {
     }
   };
 
-  const clientQuickQuestions = language === 'nl' ? [
-    'Heb je tips voor m\'n spierpijn van de training?',
-    'Kan ik morgen eventueel 10 minuten eerder starten?',
-    'Super bedankt voor de fijne sessie vandaag!',
-    'Wat is de beste warming-up oefening voor m\'n rug?',
-  ] : [
+  const clientQuickQuestions = [
     'Any tips for muscle soreness after our session?',
     'Could I possibly start 10 minutes earlier tomorrow?',
     'Thank you so much for the great training today!',
@@ -130,12 +125,10 @@ export const ClientChatTab: React.FC = () => {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <h3 className="text-xs font-bold text-slate-800">
-              {language === 'nl' ? 'Beveiligde Chatlijn met je Trainer' : 'Direct & Secure Coach Chat'}
+              {'Direct & Secure Coach Chat'}
             </h3>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              {language === 'nl'
-                ? `Stel hier je vragen aan ${settings.name} over oefeningen, voeding, herstel of planning.`
-                : `Ask ${settings.name} any questions about workouts, nutrition, recovery or rescheduling.`}
+              {`Ask ${settings.name} any questions about workouts, nutrition, recovery or rescheduling.`}
             </p>
           </div>
 
@@ -185,9 +178,7 @@ export const ClientChatTab: React.FC = () => {
               <MessageSquare className="h-8 w-8 text-slate-300 mb-2" />
               <p className="text-xs font-semibold text-slate-600">{t.noMessagesYet}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                {language === 'nl'
-                  ? 'Typ hieronder je eerste bericht of kies een van de suggesties.'
-                  : 'Type your message below or pick one of the suggestions.'}
+                {'Type your message below or pick one of the suggestions.'}
               </p>
             </div>
           )}
@@ -199,7 +190,7 @@ export const ClientChatTab: React.FC = () => {
         <div className="px-4 py-2 border-t border-slate-200/80 bg-slate-50 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
           <Sparkles className="h-3.5 w-3.5 text-emerald-600 shrink-0 ml-1" />
           <span className="text-[11px] font-bold text-slate-500 shrink-0 mr-1">
-            {language === 'nl' ? 'Suggesties' : 'Suggestions'}:
+            {'Suggestions'}:
           </span>
           {clientQuickQuestions.map((q, idx) => (
             <button
@@ -222,9 +213,7 @@ export const ClientChatTab: React.FC = () => {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
-              language === 'nl'
-                ? `Typ een bericht aan ${settings.name}...`
-                : `Type a message to ${settings.name}...`
+              `Type a message to ${settings.name}...`
             }
             className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
           />

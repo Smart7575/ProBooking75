@@ -131,7 +131,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
-            <span>{language === 'nl' ? 'Totaal Gefactureerd' : 'Total Invoiced'}</span>
+            <span>{'Total Invoiced'}</span>
             <FileText className="h-4 w-4 text-blue-500" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
@@ -139,14 +139,14 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
               {formatPrice(stats.totalInvoiced)}
             </span>
             <span className="text-[11px] font-semibold text-slate-500">
-              {stats.totalCount} {language === 'nl' ? 'facturen' : 'invoices'}
+              {stats.totalCount} {'invoices'}
             </span>
           </div>
         </div>
 
         <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4 shadow-xs">
           <div className="flex items-center justify-between text-xs text-emerald-900 font-bold uppercase tracking-wider">
-            <span>{language === 'nl' ? 'Ontvangen / Voldaan' : 'Settled / Paid'}</span>
+            <span>{'Settled / Paid'}</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
@@ -161,7 +161,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
 
         <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 shadow-xs">
           <div className="flex items-center justify-between text-xs text-amber-900 font-bold uppercase tracking-wider">
-            <span>{language === 'nl' ? 'Openstaand Saldo' : 'Pending Payment'}</span>
+            <span>{'Pending Payment'}</span>
             <Clock className="h-4 w-4 text-amber-600" />
           </div>
           <div className="mt-2 flex items-baseline justify-between">
@@ -169,7 +169,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
               {formatPrice(stats.totalPending)}
             </span>
             <span className="text-[11px] font-semibold text-amber-700">
-              {stats.countPending} {language === 'nl' ? 'openstaand' : 'pending'}
+              {stats.countPending} {'pending'}
             </span>
           </div>
         </div>
@@ -223,7 +223,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
           {/* Year Filter */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              {language === 'nl' ? 'Boekjaar' : 'Fiscal Year'}
+              {'Fiscal Year'}
             </label>
             <div className="relative">
               <select
@@ -231,7 +231,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                 onChange={(e) => setYearFilter(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-3 pr-8 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:bg-white outline-none cursor-pointer"
               >
-                <option value="all">{language === 'nl' ? 'Alle Jaren' : 'All Years'}</option>
+                <option value="all">{'All Years'}</option>
                 {availableYears.map((yr) => (
                   <option key={yr} value={yr}>
                     {yr}
@@ -251,7 +251,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder={language === 'nl' ? 'Zoek factuurnr, klant...' : 'Search invoice #, client...'}
+                placeholder={'Search invoice #, client...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8.5 pr-3 text-xs text-slate-800 focus:border-blue-500 focus:bg-white outline-none transition"
@@ -291,9 +291,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                     <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                     <p className="font-semibold text-slate-700">{t.noInvoicesYet}</p>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      {language === 'nl'
-                        ? 'Maak een nieuwe factuur aan of selecteer voltooide sessies op het tabblad "Nog te factureren".'
-                        : 'Create an invoice or select completed sessions from the "To be Invoiced" tab.'}
+                      {'Create an invoice or select completed sessions from the "To be Invoiced" tab.'}
                     </p>
                   </td>
                 </tr>
@@ -330,13 +328,13 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                             </span>
                             {inv.isCreditNote && (
                               <span className="rounded-md bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.2 text-[9px] font-sans font-extrabold uppercase tracking-wider">
-                                {language === 'nl' ? 'Creditnota' : 'Credit Note'}
+                                {'Credit Note'}
                               </span>
                             )}
                           </div>
                           {inv.isCreditNote && inv.originalInvoiceNumber && (
                             <span className="text-[10px] font-sans font-medium text-slate-500">
-                              {language === 'nl' ? 'Ref. factuur:' : 'Ref. invoice:'}{' '}
+                              {'Ref. invoice:'}{' '}
                               <strong className="font-mono text-slate-700">
                                 {inv.originalInvoiceNumber}
                               </strong>
@@ -344,7 +342,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                           )}
                           {!inv.isCreditNote && creditNoteNum && (
                             <span className="text-[10px] font-sans font-medium text-rose-600">
-                              {language === 'nl' ? 'Gecrediteerd:' : 'Credited:'}{' '}
+                              {'Credited:'}{' '}
                               <strong className="font-mono">{creditNoteNum}</strong>
                             </span>
                           )}
@@ -391,7 +389,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2.5 py-0.5 text-[11px] font-bold border border-amber-200">
                             <Clock className="h-3 w-3 text-amber-600" />
                             <span>
-                              {language === 'nl' ? 'Te betalen (Credit)' : 'To be Paid (Credit)'}
+                              {'To be Paid (Credit)'}
                             </span>
                           </span>
                         ) : (
@@ -427,13 +425,11 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                               }}
                               className="flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 transition cursor-pointer"
                               title={
-                                language === 'nl'
-                                  ? 'Maak automatisch een creditnota om deze factuur tegen te boeken'
-                                  : 'Automatically create a credit note to reverse this invoice'
+                                'Automatically create a credit note to reverse this invoice'
                               }
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
-                              <span>{language === 'nl' ? 'Creditnota' : 'Credit Note'}</span>
+                              <span>{'Credit Note'}</span>
                             </button>
                           )}
 
@@ -451,9 +447,7 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  language === 'nl'
-                                    ? 'Document verwijderen uit administratie?'
-                                    : 'Delete document?'
+                                  'Delete document?'
                                 )
                               ) {
                                 deleteInvoice(inv.id);
@@ -478,12 +472,10 @@ export const InvoiceArchiveView: React.FC<InvoiceArchiveViewProps> = ({
         {filteredInvoices.length > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-500">
             <span>
-              {language === 'nl'
-                ? `Toont ${filteredInvoices.length} van ${invoices.length} facturen`
-                : `Showing ${filteredInvoices.length} of ${invoices.length} invoices`}
+              {`Showing ${filteredInvoices.length} of ${invoices.length} invoices`}
             </span>
             <span className="font-bold text-slate-800">
-              {language === 'nl' ? 'Totaal zichtbaar: ' : 'Visible total: '}
+              {'Visible total: '}
               {formatPrice(filteredInvoices.reduce((a, b) => a + b.totalAmount, 0))}
             </span>
           </div>

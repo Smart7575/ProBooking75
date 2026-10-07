@@ -24,6 +24,7 @@ import {
   Settings2,
   Coffee,
   CalendarRange,
+  Users,
 } from 'lucide-react';
 import {
   formatDateISO,
@@ -38,16 +39,19 @@ import {
   endTimeToMinutes,
   minutesToTime,
 } from '../../utils/dateUtils';
-import { Appointment, AppointmentStatus, ScheduleException } from '../../types';
+import { Appointment, AppointmentStatus, ScheduleException, GroupSession } from '../../types';
 import { AdHocAvailabilityModal } from './AdHocAvailabilityModal';
 import { GoogleCalendarTimeBlockModal } from './GoogleCalendarTimeBlockModal';
 import { FixedWeeklyScheduleModal } from './FixedWeeklyScheduleModal';
+import { CreateGroupSessionModal } from './CreateGroupSessionModal';
+import { GroupSessionDetailsModal } from './GroupSessionDetailsModal';
 
 type CalendarViewMode = 'month' | 'week' | 'day';
 
 export const CalendarView: React.FC = () => {
   const {
     appointments,
+    groupSessions,
     clients,
     settings,
     updateAppointmentStatus,
@@ -65,7 +69,7 @@ export const CalendarView: React.FC = () => {
     language,
     t,
   } = useBooking();
-  const isNl = language === 'nl';
+  
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
@@ -85,6 +89,10 @@ export const CalendarView: React.FC = () => {
     serviceId: '',
     price: 0,
   });
+
+  // Group Session modal states
+  const [isCreateGroupSessionOpen, setIsCreateGroupSessionOpen] = useState(false);
+  const [selectedGroupSession, setSelectedGroupSession] = useState<GroupSession | null>(null);
 
   // Calendar time view range state (Default: 06:00 - 00:00 / 24:00)
   const [startHour, setStartHour] = useState<number>(() => {
@@ -517,7 +525,7 @@ export const CalendarView: React.FC = () => {
             </button>
           </div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 ml-2 tracking-tight">
-            {currentDate.toLocaleDateString(isNl ? 'nl-NL' : 'en-US', {
+            {currentDate.toLocaleDateString('en-US', {
               month: 'long',
               year: 'numeric',
             })}
@@ -526,18 +534,28 @@ export const CalendarView: React.FC = () => {
 
         {/* View Switcher, Time Range & Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Create Group Session Button */}
+          <button
+            onClick={() => setIsCreateGroupSessionOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-md shadow-purple-600/20 transition cursor-pointer"
+            title={
+              'Define a new group session with max capacity'
+            }
+          >
+            <Users className="h-4 w-4" />
+            <span>{'+ Group Session'}</span>
+          </button>
+
           {/* Ad Hoc Vacation Planning Button */}
           <button
             onClick={() => handleOpenAdHocModal(currentDateStr, 'vacation')}
             className="inline-flex items-center gap-1.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 text-xs font-bold shadow-md shadow-amber-500/20 transition"
             title={
-              isNl
-                ? 'Plan direct een vakantie of verlofperiode in via de kalender'
-                : 'Plan a vacation or time-off period directly via the calendar'
+              'Plan a vacation or time-off period directly via the calendar'
             }
           >
             <Palmtree className="h-4 w-4" />
-            <span>{t.planVacation || (isNl ? 'Vakantie Inplannen' : 'Plan Vacation')}</span>
+            <span>{t.planVacation || ('Plan Vacation')}</span>
           </button>
 
           {/* Quick Add Ad Hoc Availability button */}
@@ -545,13 +563,11 @@ export const CalendarView: React.FC = () => {
             onClick={() => handleOpenAdHocModal(currentDateStr, 'availability')}
             className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/20 transition"
             title={
-              isNl
-                ? 'Beschikbaarheid voor een dag instellen of aanpassen'
-                : 'Set or adjust availability for a day'
+              'Set or adjust availability for a day'
             }
           >
             <Plus className="h-4 w-4" />
-            <span>{t.addAdHocAvailability || (isNl ? 'Beschikbaarheid Instellen' : 'Set Availability')}</span>
+            <span>{t.addAdHocAvailability || ('Set Availability')}</span>
           </button>
 
           {/* Time Range Selector Popover Trigger */}
@@ -561,9 +577,7 @@ export const CalendarView: React.FC = () => {
               onClick={() => setIsTimeRangeMenuOpen(!isTimeRangeMenuOpen)}
               className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition shadow-2xs"
               title={
-                isNl
-                  ? 'Wijzig de getoonde uren in de kalender (Standaard: 06:00 - 00:00)'
-                  : 'Change visible hours in the calendar (Default: 06:00 - 00:00)'
+                'Change visible hours in the calendar (Default: 06:00 - 00:00)'
               }
             >
               <Clock className="h-3.5 w-3.5 text-slate-500" />
@@ -578,7 +592,7 @@ export const CalendarView: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <Sliders className="h-4 w-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-900">
-                      {isNl ? 'Kalender Tijdweergave' : 'Calendar Time Range'}
+                      {'Calendar Time Range'}
                     </span>
                   </div>
                   <button
@@ -591,9 +605,7 @@ export const CalendarView: React.FC = () => {
                 </div>
 
                 <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-                  {isNl
-                    ? 'Kies welke uren zichtbaar zijn in het dag- en weekrooster.'
-                    : 'Choose which hours are visible in the day and week view.'}
+                  {'Choose which hours are visible in the day and week view.'}
                 </p>
 
                 {/* Preset Buttons */}
@@ -609,7 +621,7 @@ export const CalendarView: React.FC = () => {
                   >
                     <span>06:00 - 00:00</span>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
-                      {isNl ? 'Standaard' : 'Default'}
+                      {'Default'}
                     </span>
                   </button>
 
@@ -624,7 +636,7 @@ export const CalendarView: React.FC = () => {
                   >
                     <span>07:00 - 22:00</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {isNl ? 'Uitgebreid' : 'Extended'}
+                      {'Extended'}
                     </span>
                   </button>
 
@@ -639,7 +651,7 @@ export const CalendarView: React.FC = () => {
                   >
                     <span>08:00 - 20:00</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {isNl ? 'Klassiek' : 'Classic'}
+                      {'Classic'}
                     </span>
                   </button>
                 </div>
@@ -647,12 +659,12 @@ export const CalendarView: React.FC = () => {
                 {/* Custom Range Sliders / Inputs */}
                 <div className="pt-2 border-t border-slate-100">
                   <span className="text-[11px] font-bold text-slate-600 block mb-2">
-                    {isNl ? 'Aangepast Bereik:' : 'Custom Range:'}
+                    {'Custom Range:'}
                   </span>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-1 font-semibold">
-                        {isNl ? 'Startuur' : 'Start Hour'}
+                        {'Start Hour'}
                       </label>
                       <select
                         value={startHour}
@@ -668,7 +680,7 @@ export const CalendarView: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-1 font-semibold">
-                        {isNl ? 'Einduur' : 'End Hour'}
+                        {'End Hour'}
                       </label>
                       <select
                         value={endHour}
@@ -678,9 +690,7 @@ export const CalendarView: React.FC = () => {
                         {Array.from({ length: 24 }).map((_, h) => (
                           <option key={h + 1} value={h + 1}>
                             {h + 1 === 24
-                              ? isNl
-                                ? '00:00 (middernacht)'
-                                : '00:00 (midnight)'
+                              ? '00:00 (midnight)'
                               : `${String(h + 1).padStart(2, '0')}:00`}
                           </option>
                         ))}
@@ -737,12 +747,12 @@ export const CalendarView: React.FC = () => {
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {t.activeAvailabilityMode || (isNl ? 'Standaard Planningsmethode' : 'Active Scheduling Mode')}
+                {t.activeAvailabilityMode || ('Active Scheduling Mode')}
               </div>
               <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="text-emerald-700 font-extrabold">
-                  {t.adhocScheduleMode || (isNl ? 'Ad Hoc Planning (Standaard actief)' : 'Ad Hoc Flexible Schedule')}
+                  {t.adhocScheduleMode || ('Ad Hoc Flexible Schedule')}
                 </span>
               </div>
             </div>
@@ -753,26 +763,24 @@ export const CalendarView: React.FC = () => {
             onClick={() => setIsFixedScheduleModalOpen(true)}
             className="ml-0 sm:ml-2 rounded-xl border border-emerald-300 bg-emerald-50/80 hover:bg-emerald-100 px-3.5 py-1.5 text-xs font-bold text-emerald-900 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
             title={
-              isNl
-                ? 'Stel een vast weekrooster in voor een specifieke startdatum t/m einddatum'
-                : 'Set a fixed weekly schedule for a specific start date to end date'
+              'Set a fixed weekly schedule for a specific start date to end date'
             }
           >
             <CalendarRange className="h-3.5 w-3.5 text-emerald-700" />
-            <span>{isNl ? 'Vast Rooster Toevoegen' : 'Add Fixed Schedule'}</span>
+            <span>{'Add Fixed Schedule'}</span>
           </button>
         </div>
 
         {/* Right: Color Legend showing exact meaning of colors on the calendar */}
         <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] font-semibold text-slate-600 bg-slate-50/90 py-2 px-3.5 rounded-2xl border border-slate-200/70">
           <span className="text-slate-400 font-bold uppercase text-[10px]">
-            {isNl ? 'Legenda:' : 'Legend:'}
+            {'Legend:'}
           </span>
           {/* Green: Available (Solid) */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-emerald-200 border-2 border-emerald-600 shadow-2xs"></span>
             <span className="text-emerald-950 font-extrabold">
-              {t.calendarAvailableTime || (isNl ? 'Beschikbare werktijd (Duidelijk groen)' : 'Available Working Hours')}
+              {t.calendarAvailableTime || ('Available Working Hours')}
             </span>
           </span>
           {/* Purple: Pauze */}
@@ -780,28 +788,36 @@ export const CalendarView: React.FC = () => {
             <span className="h-3.5 w-3.5 rounded-md bg-purple-200 border-2 border-purple-500 shadow-2xs"></span>
             <span className="text-purple-950 font-extrabold flex items-center gap-1">
               <Coffee className="h-3 w-3 text-purple-700" />
-              {isNl ? 'Pauze / Rusttijd (Paars)' : 'Break / Rest Time'}
+              {'Break / Rest Time'}
             </span>
           </span>
           {/* Slate: Off */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-slate-100 border border-dashed border-slate-300"></span>
             <span className="text-slate-500">
-              {t.calendarUnavailableTime || (isNl ? 'Buiten werktijd / Vrij' : 'Unavailable / Off')}
+              {t.calendarUnavailableTime || ('Unavailable / Off')}
             </span>
           </span>
           {/* Amber: Blocked */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-amber-200 border border-amber-400"></span>
             <span className="text-amber-800 font-medium">
-              {isNl ? 'Geblokkeerd / Vakantie' : 'Blocked / Vacation'}
+              {'Blocked / Vacation'}
             </span>
           </span>
           {/* Blue: Booked */}
           <span className="flex items-center gap-1.5">
             <span className="h-3.5 w-3.5 rounded-md bg-blue-500"></span>
             <span className="text-blue-800 font-medium">
-              {isNl ? 'Geboekte sessies' : 'Booked Sessions'}
+              {'Booked Sessions'}
+            </span>
+          </span>
+
+          {/* Purple: Group Sessions */}
+          <span className="flex items-center gap-1.5">
+            <span className="h-3.5 w-3.5 rounded-md bg-purple-600"></span>
+            <span className="text-purple-800 font-medium">
+              {'Group Sessions'}
             </span>
           </span>
         </div>
@@ -812,13 +828,13 @@ export const CalendarView: React.FC = () => {
         <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/50">
           {/* Day of week headers */}
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-900 text-center text-xs font-bold text-slate-300 py-3">
-            <div>{isNl ? 'Ma' : 'Mon'}</div>
-            <div>{isNl ? 'Di' : 'Tue'}</div>
-            <div>{isNl ? 'Wo' : 'Wed'}</div>
-            <div>{isNl ? 'Do' : 'Thu'}</div>
-            <div>{isNl ? 'Vr' : 'Fri'}</div>
-            <div>{isNl ? 'Za' : 'Sat'}</div>
-            <div>{isNl ? 'Zo' : 'Sun'}</div>
+            <div>{'Mon'}</div>
+            <div>{'Tue'}</div>
+            <div>{'Wed'}</div>
+            <div>{'Thu'}</div>
+            <div>{'Fri'}</div>
+            <div>{'Sat'}</div>
+            <div>{'Sun'}</div>
           </div>
 
           {/* Month day cells */}
@@ -860,7 +876,7 @@ export const CalendarView: React.FC = () => {
                       {/* Clear Availability Tag (Solid, Non-transparent) */}
                       {availInfo.isException ? (
                         <span className="text-[9px] text-amber-900 font-bold bg-amber-200 px-1.5 py-0.5 rounded-md border border-amber-300">
-                          {isNl ? 'Geblokkeerd' : 'Blocked'}
+                          {'Blocked'}
                         </span>
                       ) : availInfo.isAvailable ? (
                         <div className="flex flex-col items-end gap-0.5">
@@ -868,9 +884,7 @@ export const CalendarView: React.FC = () => {
                             <span
                               className="text-[9px] font-extrabold text-emerald-950 bg-emerald-200 px-2 py-0.5 rounded-md border border-emerald-400 flex items-center gap-1 shadow-2xs"
                               title={
-                                isNl
-                                  ? `Beschikbaar: ${availInfo.description}`
-                                  : `Available: ${availInfo.description}`
+                                `Available: ${availInfo.description}`
                               }
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-700"></span>
@@ -884,9 +898,7 @@ export const CalendarView: React.FC = () => {
                               }}
                               className="p-0.5 rounded-md bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 transition cursor-pointer shadow-2xs"
                               title={
-                                isNl
-                                  ? 'Alle beschikbare tijden van deze dag wissen (geplande sessies blijven behouden)'
-                                  : 'Clear all available times for this day (booked sessions are preserved)'
+                                'Clear all available times for this day (booked sessions are preserved)'
                               }
                             >
                               <Trash2 className="h-2.5 w-2.5" />
@@ -895,25 +907,60 @@ export const CalendarView: React.FC = () => {
                           {availInfo.blocks.some((b) => b.breakStart && b.breakEnd) && (
                             <span
                               className="text-[8px] font-bold text-purple-950 bg-purple-200/90 px-1 py-0.2 rounded border border-purple-300 flex items-center gap-0.5 shadow-2xs"
-                              title={`${isNl ? 'Pauze' : 'Break'}: ${availInfo.blocks
+                              title={`${'Break'}: ${availInfo.blocks
                                 .filter((b) => b.breakStart && b.breakEnd)
                                 .map((b) => `${b.breakStart} - ${b.breakEnd}`)
                                 .join(', ')}`}
                             >
                               <Coffee className="h-2 w-2 text-purple-700 shrink-0" />
-                              <span>{isNl ? 'Pauze' : 'Break'}</span>
+                              <span>{'Break'}</span>
                             </span>
                           )}
                         </div>
                       ) : (
                         <span className="text-[9px] font-medium text-slate-400 bg-slate-200/60 px-1.5 py-0.5 rounded-md">
-                          {isNl ? 'Vrij' : 'Off'}
+                          {'Off'}
                         </span>
                       )}
                     </div>
 
                     {/* Appointments list in day cell */}
                     <div className="space-y-1 overflow-y-auto max-h-[70px] scrollbar-none mt-1">
+                      {/* Group Sessions badges in Month day cell */}
+                      {(() => {
+                        const dayGroupSessions = (groupSessions || []).filter(
+                          (gs) => gs.date === dateStr && gs.status !== 'cancelled'
+                        );
+                        return dayGroupSessions.map((gs) => {
+                          const confirmedCount = (gs.participants || []).filter(
+                            (p) => p.status === 'confirmed'
+                          ).length;
+                          const isFull = confirmedCount >= gs.maxParticipants;
+                          return (
+                            <button
+                              key={gs.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGroupSession(gs);
+                              }}
+                              className={`w-full text-left truncate rounded-lg px-2 py-0.5 text-[10px] font-bold border transition shadow-2xs ${
+                                isFull
+                                  ? 'bg-purple-200 text-purple-950 border-purple-400'
+                                  : 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200'
+                              }`}
+                              title={`Group Session: ${gs.title} (${confirmedCount}/${gs.maxParticipants} participants)`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="truncate">👥 {gs.startTime} {gs.title}</span>
+                                <span className="text-[9px] shrink-0 font-extrabold px-1 rounded bg-purple-300/80">
+                                  {confirmedCount}/{gs.maxParticipants}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
+
                       {dayAppts.map((appt) => {
                         const client = clients.find((c) => c.id === appt.clientId);
                         const service = settings.services.find((s) => s.id === appt.serviceId);
@@ -927,10 +974,10 @@ export const CalendarView: React.FC = () => {
                             className={`w-full text-left truncate rounded-lg px-2 py-0.5 text-[10px] font-medium border transition shadow-2xs ${getStatusBadgeClass(
                               appt.status
                             )}`}
-                            title={`${appt.startTime} - ${client?.name || (isNl ? 'Klant' : 'Client')} (${service?.name})`}
+                            title={`${appt.startTime} - ${client?.name || ('Client')} (${service?.name})`}
                           >
                             <span className="font-bold">{appt.startTime}</span>{' '}
-                            <span>{client?.name || (isNl ? 'Klant' : 'Client')}</span>
+                            <span>{client?.name || ('Client')}</span>
                           </button>
                         );
                       })}
@@ -941,7 +988,7 @@ export const CalendarView: React.FC = () => {
                   {availabilityMode === 'adhoc' && inMonth && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pt-1 flex justify-end">
                       <span className="text-[9px] font-bold text-emerald-700 bg-white/90 border border-emerald-200 px-1.5 py-0.5 rounded-md shadow-2xs">
-                        {isNl ? 'Uren aanpassen ✏️' : 'Edit hours ✏️'}
+                        {'Edit hours ✏️'}
                       </span>
                     </div>
                   )}
@@ -959,7 +1006,7 @@ export const CalendarView: React.FC = () => {
             {/* Week Header */}
             <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-900 text-center text-xs font-semibold text-slate-300 py-3.5">
               <div className="text-slate-400 font-medium flex items-center justify-center">
-                {t.timeHeader || (isNl ? 'Tijd' : 'Time')}
+                {t.timeHeader || ('Time')}
               </div>
               {weekDays.map((d, i) => {
                 const dStr = formatDateISO(d);
@@ -977,14 +1024,12 @@ export const CalendarView: React.FC = () => {
                     }`}
                     title={
                       availabilityMode === 'adhoc'
-                        ? isNl
-                          ? 'Klik om beschikbaarheid voor deze dag in te stellen'
-                          : 'Click to set availability for this day'
+                        ? 'Click to set availability for this day'
                         : ''
                     }
                   >
                     <span className="text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-                      {d.toLocaleDateString(isNl ? 'nl-NL' : 'en-US', { weekday: 'short' })}
+                      {d.toLocaleDateString('en-US', { weekday: 'short' })}
                     </span>
                     <span
                       className={`mt-1 flex h-7 w-7 items-center justify-center rounded-xl text-xs font-bold ${
@@ -998,7 +1043,7 @@ export const CalendarView: React.FC = () => {
                     <div className="mt-1">
                       {availInfo.isException ? (
                         <span className="text-[9px] font-bold text-amber-300 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-700">
-                          {isNl ? 'Geblokkeerd' : 'Blocked'}
+                          {'Blocked'}
                         </span>
                       ) : availInfo.isAvailable ? (
                         <div className="flex flex-col items-center gap-1">
@@ -1009,7 +1054,7 @@ export const CalendarView: React.FC = () => {
                           {availInfo.blocks.some((b) => b.breakStart && b.breakEnd) && (
                             <span
                               className="text-[8px] font-bold text-purple-200 bg-purple-950/80 px-1.5 py-0.2 rounded border border-purple-700/80 flex items-center gap-0.5 shadow-2xs"
-                              title={`${isNl ? 'Pauze' : 'Break'}: ${availInfo.blocks
+                              title={`${'Break'}: ${availInfo.blocks
                                 .filter((b) => b.breakStart && b.breakEnd)
                                 .map((b) => `${b.breakStart} - ${b.breakEnd}`)
                                 .join(', ')}`}
@@ -1029,18 +1074,16 @@ export const CalendarView: React.FC = () => {
                             }}
                             className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-rose-500/20 hover:bg-rose-600 border border-rose-400/40 hover:border-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-rose-200 hover:text-white transition cursor-pointer shadow-2xs"
                             title={
-                              isNl
-                                ? 'Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)'
-                                : 'Clear all available times for this day in 1 click (booked sessions are preserved)'
+                              'Clear all available times for this day in 1 click (booked sessions are preserved)'
                             }
                           >
                             <Trash2 className="h-2.5 w-2.5 shrink-0" />
-                            <span>{isNl ? 'Wis tijden' : 'Clear hours'}</span>
+                            <span>{'Clear hours'}</span>
                           </button>
                         </div>
                       ) : (
                         <span className="text-[9px] font-medium text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {isNl ? 'Vrij' : 'Off'}
+                          {'Off'}
                         </span>
                       )}
                     </div>
@@ -1100,9 +1143,7 @@ export const CalendarView: React.FC = () => {
                           }}
                           className="absolute inset-x-0 border-b border-slate-100/90 hover:bg-emerald-50/20 transition cursor-pointer"
                           title={
-                            isNl
-                              ? `Klik om beschikbaarheid in te voeren om ${hour}`
-                              : `Click to set availability at ${hour}`
+                            `Click to set availability at ${hour}`
                           }
                         >
                           {/* 30-minute subtle dashed guideline */}
@@ -1121,19 +1162,17 @@ export const CalendarView: React.FC = () => {
                           }}
                           className="absolute inset-x-1 top-1 bottom-1 rounded-2xl bg-amber-100/90 border-2 border-amber-400 p-2.5 shadow-xs cursor-pointer z-20 flex flex-col items-center justify-center text-center group/vacation transition hover:bg-amber-200/90"
                           title={
-                            isNl
-                              ? 'Geblokkeerd wegens vakantie / verlof. Klik om te beheren.'
-                              : 'Blocked due to vacation / time off. Click to manage.'
+                            'Blocked due to vacation / time off. Click to manage.'
                           }
                         >
                           <Palmtree className="h-6 w-6 text-amber-600 mb-1" />
                           <span className="text-xs font-black text-amber-950 block truncate max-w-full">
                             {(settings.exceptions || []).find(
                               (ex) => dStr >= ex.startDate && dStr <= ex.endDate
-                            )?.title || (isNl ? 'Vakantie' : 'Vacation')}
+                            )?.title || ('Vacation')}
                           </span>
                           <span className="text-[10px] text-amber-800 font-bold mt-0.5">
-                            {isNl ? 'Geblokkeerd' : 'Blocked'}
+                            {'Blocked'}
                           </span>
                         </div>
                       )}
@@ -1169,9 +1208,7 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-1 rounded-xl bg-emerald-100/95 border-2 border-emerald-500 text-emerald-950 p-1.5 shadow-2xs hover:bg-emerald-200 hover:border-emerald-600 cursor-pointer z-10 transition flex flex-col justify-between overflow-hidden group/slot"
                               title={
-                                isNl
-                                  ? `Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Klik om aan te passen.`
-                                  : `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Click to edit.`
+                                `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration}m). Click to edit.`
                               }
                             >
                               <div className="flex items-center justify-between gap-1 leading-tight">
@@ -1186,10 +1223,10 @@ export const CalendarView: React.FC = () => {
                               {heightPx >= 36 && (
                                 <div className="flex items-center justify-between text-[9px] text-emerald-900 font-semibold truncate mt-0.5">
                                   <span className="truncate">
-                                    {isNl ? 'Beschikbaar' : 'Available'}
+                                    {'Available'}
                                   </span>
                                   <span className="opacity-0 group-hover/slot:opacity-100 text-emerald-700 font-bold underline transition">
-                                    {isNl ? 'Wijzig' : 'Edit'}
+                                    {'Edit'}
                                   </span>
                                 </div>
                               )}
@@ -1211,14 +1248,12 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-md bg-slate-100/90 border-y border-dashed border-slate-300/80 text-[8px] font-bold text-slate-500 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
                               title={
-                                isNl
-                                  ? `Tussenruimte / rusttijd: ${buf.duration} min`
-                                  : `Buffer / rest time: ${buf.duration} min`
+                                `Buffer / rest time: ${buf.duration} min`
                               }
                             >
                               {heightPx >= 12 && (
                                 <span>
-                                  +{buf.duration}m {isNl ? 'rust' : 'buffer'}
+                                  +{buf.duration}m {'buffer'}
                                 </span>
                               )}
                             </div>
@@ -1256,15 +1291,13 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-1 rounded-xl bg-purple-200/95 border-2 border-purple-500 text-purple-950 hover:bg-purple-300 hover:border-purple-600 p-1.5 shadow-xs cursor-pointer z-15 transition flex flex-col justify-center overflow-hidden group/break"
                               title={
-                                isNl
-                                  ? `Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`
-                                  : `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
+                                `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
                               }
                             >
                               <div className="flex items-center justify-between gap-1 leading-tight">
                                 <span className="text-[10px] font-black text-purple-950 flex items-center gap-1 truncate">
                                   <Coffee className="h-3 w-3 text-purple-700 shrink-0" />
-                                  {isNl ? 'Pauze' : 'Break'} {brk.startTimeStr} - {brk.endTimeStr}
+                                  {'Break'} {brk.startTimeStr} - {brk.endTimeStr}
                                 </span>
                                 <span className="text-[9px] font-extrabold text-purple-900 bg-white/80 border border-purple-300 px-1 py-0.2 rounded shrink-0">
                                   {brk.duration}m
@@ -1273,10 +1306,10 @@ export const CalendarView: React.FC = () => {
                               {heightPx >= 38 && (
                                 <div className="flex items-center justify-between text-[9px] text-purple-900 font-bold truncate mt-0.5">
                                   <span>
-                                    {isNl ? 'Rusttijd / Geen boekingen' : 'Break / No bookings'}
+                                    {'Break / No bookings'}
                                   </span>
                                   <span className="opacity-0 group-hover/break:opacity-100 underline text-purple-800 transition">
-                                    {isNl ? 'Wijzig' : 'Edit'}
+                                    {'Edit'}
                                   </span>
                                 </div>
                               )}
@@ -1312,7 +1345,7 @@ export const CalendarView: React.FC = () => {
                               <span>{appt.packageId ? 'Credit' : formatPrice(appt.price)}</span>
                             </div>
                             <div className="font-bold text-[11px] truncate">
-                              {client?.name || (isNl ? 'Klant' : 'Client')}
+                              {client?.name || ('Client')}
                             </div>
                             {heightPx >= 48 && (
                               <div className="text-[9px] opacity-80 truncate">
@@ -1322,6 +1355,64 @@ export const CalendarView: React.FC = () => {
                           </div>
                         );
                       })}
+
+                      {/* Group Sessions on Week Timeline */}
+                      {(() => {
+                        const dayGroupSessions = (groupSessions || []).filter(
+                          (gs) => gs.date === dStr && gs.status !== 'cancelled'
+                        );
+                        return dayGroupSessions.map((gs) => {
+                          const gsStart = timeToMinutes(gs.startTime);
+                          const gsDur = gs.durationMinutes || 60;
+                          const topPx = Math.max(0, gsStart - visibleStartMin);
+                          const heightPx = Math.max(34, gsDur - 2);
+                          const confirmedCount = (gs.participants || []).filter(
+                            (p) => p.status === 'confirmed'
+                          ).length;
+                          const isFull = confirmedCount >= gs.maxParticipants;
+
+                          if (topPx + heightPx <= 0 || topPx >= totalTimelineHeight) return null;
+
+                          return (
+                            <div
+                              key={gs.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGroupSession(gs);
+                              }}
+                              style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                              className="absolute inset-x-0.5 rounded-xl p-1.5 text-xs shadow-md border-2 z-25 cursor-pointer transition flex flex-col justify-between overflow-hidden bg-purple-600 text-white border-purple-400 hover:bg-purple-700"
+                            >
+                              <div className="flex items-center justify-between leading-tight font-black text-[10px]">
+                                <span className="flex items-center gap-1 truncate">
+                                  <Users className="h-3 w-3 inline shrink-0" />
+                                  <span>{gs.startTime} - {gs.endTime}</span>
+                                </span>
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+                                    isFull ? 'bg-rose-500 text-white' : 'bg-purple-800 text-purple-100'
+                                  }`}
+                                >
+                                  {confirmedCount}/{gs.maxParticipants}
+                                </span>
+                              </div>
+                              <div className="font-bold text-[11px] truncate">
+                                {gs.title}
+                              </div>
+                              {heightPx >= 48 && (
+                                <div className="text-[9px] text-purple-200 truncate flex items-center justify-between">
+                                  <span>{formatPrice(gs.price)} p.p.</span>
+                                  <span className="font-semibold">
+                                    {isFull
+                                      ? ('Full')
+                                      : `${gs.maxParticipants - confirmedCount} ${'open'}`}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
 
                       {/* Current Time Indicator for Today */}
                       {isToday && (() => {
@@ -1356,7 +1447,7 @@ export const CalendarView: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-5 gap-4">
             <div>
               <span className="text-xs text-emerald-600 font-bold uppercase tracking-wider">
-                {isNl ? 'Dagoverzicht & Agenda' : 'Daily Overview & Schedule'}
+                {'Daily Overview & Schedule'}
               </span>
               <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                 {formatFullHumanDate(currentDateStr)}
@@ -1388,15 +1479,9 @@ export const CalendarView: React.FC = () => {
                     ></span>
                     <span>
                       {dayInfo.isException
-                        ? isNl
-                          ? 'Vakantie / Geblokkeerd'
-                          : 'Vacation / Blocked'
+                        ? 'Vacation / Blocked'
                         : dayInfo.isAvailable
-                        ? isNl
-                          ? `Beschikbaar: ${dayInfo.description} (${dayInfo.totalHours} u)`
-                          : `Available: ${dayInfo.description} (${dayInfo.totalHours} h)`
-                        : isNl
-                        ? 'Geen beschikbaarheid (Vrij)'
+                        ? `Available: ${dayInfo.description} (${dayInfo.totalHours} h)`
                         : 'No availability (Off)'}
                     </span>
                   </div>
@@ -1405,7 +1490,7 @@ export const CalendarView: React.FC = () => {
                     <div className="px-3 py-1.5 rounded-2xl border text-xs font-bold flex items-center gap-1.5 bg-purple-100 text-purple-900 border-purple-300 shadow-2xs">
                       <Coffee className="h-3.5 w-3.5 text-purple-700" />
                       <span>
-                        {isNl ? 'Pauze:' : 'Break:'}{' '}
+                        {'Break:'}{' '}
                         {dayInfo.blocks
                           .filter((b) => b.breakStart && b.breakEnd)
                           .map((b) => `${b.breakStart} - ${b.breakEnd}`)
@@ -1420,13 +1505,11 @@ export const CalendarView: React.FC = () => {
                       onClick={() => setAdHocBlocksForDate(currentDateStr, [])}
                       className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
                       title={
-                        isNl
-                          ? 'Alle beschikbare tijden van deze dag met 1 klik wissen (geplande sessies blijven behouden)'
-                          : 'Clear all available times for this day in 1 click (booked sessions are preserved)'
+                        'Clear all available times for this day in 1 click (booked sessions are preserved)'
                       }
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>{isNl ? 'Wis Tijden' : 'Clear Hours'}</span>
+                      <span>{'Clear Hours'}</span>
                     </button>
                   )}
 
@@ -1435,22 +1518,98 @@ export const CalendarView: React.FC = () => {
                     className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs flex items-center gap-1.5"
                   >
                     <Sliders className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>{isNl ? 'Uren Aanpassen' : 'Edit Hours'}</span>
+                    <span>{'Edit Hours'}</span>
                   </button>
                 </div>
               );
             })()}
           </div>
 
+          {/* Group Sessions on this day */}
+          {(() => {
+            const dayGroupSessions = (groupSessions || []).filter(
+              (gs) => gs.date === currentDateStr && gs.status !== 'cancelled'
+            );
+            if (dayGroupSessions.length === 0) return null;
+
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-purple-800 flex items-center gap-1.5">
+                    <Users className="h-4 w-4" />
+                    <span>{'Group Sessions on this day'} ({dayGroupSessions.length})</span>
+                  </h4>
+                  <button
+                    onClick={() => setIsCreateGroupSessionOpen(true)}
+                    className="text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{'New Group Session'}</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {dayGroupSessions.map((gs) => {
+                    const confirmedCount = (gs.participants || []).filter(
+                      (p) => p.status === 'confirmed'
+                    ).length;
+                    const spotsLeft = Math.max(0, gs.maxParticipants - confirmedCount);
+                    const isFull = spotsLeft === 0;
+
+                    return (
+                      <div
+                        key={gs.id}
+                        onClick={() => setSelectedGroupSession(gs)}
+                        className="cursor-pointer p-4 rounded-2xl border-2 border-purple-200 bg-purple-50/70 hover:bg-purple-100/70 transition flex items-center justify-between gap-3 shadow-xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-center justify-center rounded-xl bg-purple-700 px-3 py-2 text-white min-w-[70px]">
+                            <span className="font-bold text-xs text-purple-100">{gs.startTime}</span>
+                            <span className="text-[10px] text-purple-300">{gs.endTime}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-sm font-bold text-slate-900">{gs.title}</h5>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                                  isFull
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                }`}
+                              >
+                                {isFull ? ('Full') : `${spotsLeft} ${'open'}`}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              {confirmedCount} / {gs.maxParticipants} {'participants'} • {formatPrice(gs.price)} p.p.
+                            </p>
+                            {gs.location && (
+                              <p className="text-[11px] text-slate-500 mt-0.5">📍 {gs.location}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-bold text-purple-700 bg-white border border-purple-300 px-2.5 py-1 rounded-xl shadow-2xs">
+                            {'Manage 👥'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Appointments on this day */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              {isNl ? 'Afspraken op deze dag' : 'Appointments on this day'} ({appointments.filter((a) => a.date === currentDateStr).length})
+              {'Appointments on this day'} ({appointments.filter((a) => a.date === currentDateStr).length})
             </h4>
 
             {appointments.filter((a) => a.date === currentDateStr).length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
-                {isNl ? 'Geen afspraken gepland voor deze dag.' : 'No appointments scheduled for this day.'}
+                {'No appointments scheduled for this day.'}
               </div>
             ) : (
               appointments
@@ -1523,18 +1682,14 @@ export const CalendarView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {isNl
-                    ? 'Uurschema & Werktijden (Exact op de minuut gepositioneerd)'
-                    : 'Hourly Schedule & Working Hours (Minute-Accurate Positioning)'}
+                  {'Hourly Schedule & Working Hours (Minute-Accurate Positioning)'}
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  {isNl
-                    ? 'Tijdsblokken en pauzes zijn exact gepositioneerd volgens je ingestelde blokduur en tussenruimte.'
-                    : 'Time slots and breaks are positioned accurately based on your configured slot duration and buffer time.'}
+                  {'Time slots and breaks are positioned accurately based on your configured slot duration and buffer time.'}
                 </p>
               </div>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                {isNl ? 'Direct aanraken & wijzigen' : 'Click or tap to edit'}
+                {'Click or tap to edit'}
               </span>
             </div>
 
@@ -1576,9 +1731,7 @@ export const CalendarView: React.FC = () => {
                       }}
                       className="absolute inset-x-0 border-b border-slate-100/90 hover:bg-emerald-50/20 transition cursor-pointer"
                       title={
-                        isNl
-                          ? `Klik om beschikbaarheid in te voeren om ${hour}`
-                          : `Click to set availability at ${hour}`
+                        `Click to set availability at ${hour}`
                       }
                     >
                       <div className="absolute top-[30px] inset-x-0 border-b border-dashed border-slate-100/70 pointer-events-none" />
@@ -1604,12 +1757,10 @@ export const CalendarView: React.FC = () => {
                         >
                           <Palmtree className="h-8 w-8 text-amber-600 mb-2" />
                           <h4 className="text-base font-black text-amber-950">
-                            {exc?.title || (isNl ? 'Vakantie / Geblokkeerd' : 'Vacation / Blocked')}
+                            {exc?.title || ('Vacation / Blocked')}
                           </h4>
                           <p className="text-xs text-amber-800 font-semibold mt-1">
-                            {isNl
-                              ? 'Geen afspraken mogelijk op deze dag. Klik om te beheren.'
-                              : 'No appointments possible on this day. Click to manage.'}
+                            {'No appointments possible on this day. Click to manage.'}
                           </p>
                         </div>
                       );
@@ -1647,9 +1798,7 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-xl bg-emerald-100/95 border-2 border-emerald-500 text-emerald-950 p-2 shadow-2xs hover:bg-emerald-200 hover:border-emerald-600 cursor-pointer z-10 transition flex items-center justify-between overflow-hidden group/slot"
                               title={
-                                isNl
-                                  ? `Beschikbaar blok: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Klik om aan te passen.`
-                                  : `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Click to edit.`
+                                `Available slot: ${slot.startTimeStr} - ${slot.endTimeStr} (${slot.duration} min). Click to edit.`
                               }
                             >
                               <div className="flex items-center gap-2">
@@ -1658,7 +1807,7 @@ export const CalendarView: React.FC = () => {
                                   {slot.startTimeStr} - {slot.endTimeStr}
                                 </span>
                                 <span className="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-300 px-1.5 py-0.5 rounded">
-                                  {slot.duration} min {isNl ? 'tijdsblok' : 'time slot'}
+                                  {slot.duration} min {'time slot'}
                                 </span>
                                 {slot.block.notes && (
                                   <span className="text-[11px] text-emerald-900 font-medium italic truncate max-w-xs">
@@ -1668,7 +1817,7 @@ export const CalendarView: React.FC = () => {
                               </div>
                               <span className="text-[10px] font-bold text-emerald-800 bg-white/90 border border-emerald-300 px-2 py-0.5 rounded-md shadow-2xs flex items-center gap-1 group-hover/slot:bg-emerald-700 group-hover/slot:text-white transition">
                                 <Pencil className="h-3 w-3" />
-                                <span>{isNl ? 'Aanpassen' : 'Edit'}</span>
+                                <span>{'Edit'}</span>
                               </span>
                             </div>
                           );
@@ -1687,7 +1836,7 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-4 rounded-md bg-slate-100/90 border-y border-dashed border-slate-300/80 text-[9px] font-bold text-slate-500 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
                             >
-                              +{buf.duration} min {isNl ? 'tussenruimte / buffer' : 'buffer / rest time'}
+                              +{buf.duration} min {'buffer / rest time'}
                             </div>
                           );
                         })}
@@ -1722,23 +1871,21 @@ export const CalendarView: React.FC = () => {
                               style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                               className="absolute inset-x-2 rounded-xl bg-purple-200/95 border-2 border-purple-500 text-purple-950 hover:bg-purple-300 hover:border-purple-600 p-2 shadow-xs cursor-pointer z-15 transition flex items-center justify-between overflow-hidden group/break"
                               title={
-                                isNl
-                                  ? `Pauze van ${brk.startTimeStr} tot ${brk.endTimeStr} (${brk.duration} min). Klik om aan te passen.`
-                                  : `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
+                                `Break from ${brk.startTimeStr} to ${brk.endTimeStr} (${brk.duration} min). Click to edit.`
                               }
                             >
                               <div className="flex items-center gap-2">
                                 <Coffee className="h-4 w-4 text-purple-700 shrink-0" />
                                 <span className="text-xs font-black text-purple-950">
-                                  {isNl ? 'Pauze:' : 'Break:'} {brk.startTimeStr} - {brk.endTimeStr}
+                                  {'Break:'} {brk.startTimeStr} - {brk.endTimeStr}
                                 </span>
                                 <span className="text-[10px] font-extrabold text-purple-900 bg-white border border-purple-300 px-1.5 py-0.5 rounded">
-                                  {brk.duration} min {isNl ? 'rust' : 'break'}
+                                  {brk.duration} min {'break'}
                                 </span>
                               </div>
                               <span className="text-[10px] font-bold text-purple-900 bg-white/90 border border-purple-300 px-2 py-0.5 rounded-md shadow-2xs flex items-center gap-1 group-hover/break:bg-purple-800 group-hover/break:text-white transition">
                                 <Pencil className="h-3 w-3" />
-                                <span>{isNl ? 'Pauze Wijzigen' : 'Edit Break'}</span>
+                                <span>{'Edit Break'}</span>
                               </span>
                             </div>
                           );
@@ -1772,7 +1919,7 @@ export const CalendarView: React.FC = () => {
                                   {appt.startTime} - {appt.endTime}
                                 </div>
                                 <div className="font-bold text-sm">
-                                  {client?.name || (isNl ? 'Klant' : 'Client')}
+                                  {client?.name || ('Client')}
                                 </div>
                                 <div className="text-[11px] opacity-85">
                                   ({service?.name})
@@ -1784,6 +1931,60 @@ export const CalendarView: React.FC = () => {
                             </div>
                           );
                         })}
+
+                        {/* Group Sessions on Day Timeline */}
+                        {(() => {
+                          const dayGroupSessions = (groupSessions || []).filter(
+                            (gs) => gs.date === currentDateStr && gs.status !== 'cancelled'
+                          );
+                          return dayGroupSessions.map((gs) => {
+                            const gsStart = timeToMinutes(gs.startTime);
+                            const gsDur = gs.durationMinutes || 60;
+                            const topPx = Math.max(0, gsStart - visibleStartMin);
+                            const heightPx = Math.max(36, gsDur - 2);
+                            const confirmedCount = (gs.participants || []).filter(
+                              (p) => p.status === 'confirmed'
+                            ).length;
+                            const isFull = confirmedCount >= gs.maxParticipants;
+
+                            if (topPx + heightPx <= 0 || topPx >= totalTimelineHeight) return null;
+
+                            return (
+                              <div
+                                key={gs.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedGroupSession(gs);
+                                }}
+                                style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                                className="absolute inset-x-2 rounded-xl p-2 text-xs shadow-md border-2 z-25 cursor-pointer transition flex items-center justify-between overflow-hidden bg-purple-600 text-white border-purple-400 hover:bg-purple-700"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1 font-mono font-black text-xs">
+                                    <Users className="h-3.5 w-3.5 shrink-0" />
+                                    <span>{gs.startTime} - {gs.endTime}</span>
+                                  </div>
+                                  <div className="font-bold text-sm">
+                                    {gs.title}
+                                  </div>
+                                  <div className="text-[11px] text-purple-200">
+                                    ({confirmedCount}/{gs.maxParticipants} {'participants'})
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    isFull ? 'bg-rose-500 text-white' : 'bg-purple-800 text-purple-100'
+                                  }`}>
+                                    {isFull ? ('Full') : `${gs.maxParticipants - confirmedCount} ${'open'}`}
+                                  </span>
+                                  <span className="font-bold text-xs">
+                                    {formatPrice(gs.price)} p.p.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
                       </>
                     );
                   })()}
@@ -1801,7 +2002,7 @@ export const CalendarView: React.FC = () => {
                         >
                           <div className="h-2.5 w-2.5 rounded-full bg-rose-500 -ml-1.5" />
                           <span className="ml-2 text-[9px] font-bold text-white bg-rose-500 px-1.5 py-0.2 rounded shadow-2xs">
-                            {isNl ? 'Nu' : 'Now'}
+                            {'Now'}
                           </span>
                         </div>
                       );
@@ -1893,20 +2094,20 @@ export const CalendarView: React.FC = () => {
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-emerald-950">
-                          {isNl ? 'Afspraak Bewerken' : 'Edit Appointment'}
+                          {'Edit Appointment'}
                         </span>
                         <button
                           type="button"
                           onClick={() => setIsEditingAppointment(false)}
                           className="text-slate-400 hover:text-slate-600 font-semibold"
                         >
-                          {isNl ? 'Sluiten' : 'Close'}
+                          {'Close'}
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block font-bold text-slate-700 mb-1">
-                            {isNl ? 'Datum' : 'Date'}
+                            {'Date'}
                           </label>
                           <input
                             type="date"
@@ -1917,7 +2118,7 @@ export const CalendarView: React.FC = () => {
                         </div>
                         <div>
                           <label className="block font-bold text-slate-700 mb-1">
-                            {isNl ? 'Starttijd' : 'Start Time'}
+                            {'Start Time'}
                           </label>
                           <input
                             type="time"
@@ -1930,7 +2131,7 @@ export const CalendarView: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block font-bold text-slate-700 mb-1">
-                            {isNl ? 'Dienst' : 'Service'}
+                            {'Service'}
                           </label>
                           <select
                             value={editApptForm.serviceId}
@@ -1946,7 +2147,7 @@ export const CalendarView: React.FC = () => {
                         </div>
                         <div>
                           <label className="block font-bold text-slate-700 mb-1">
-                            {isNl ? 'Prijs' : 'Price'}
+                            {'Price'}
                           </label>
                           <input
                             type="number"
@@ -1963,7 +2164,7 @@ export const CalendarView: React.FC = () => {
                           onClick={handleSaveAppointmentEdit}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-xs"
                         >
-                          {isNl ? 'Wijzigingen Opslaan' : 'Save Changes'}
+                          {'Save Changes'}
                         </button>
                       </div>
                     </div>
@@ -2034,7 +2235,7 @@ export const CalendarView: React.FC = () => {
                         className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        <span>{isNl ? 'Bewerken' : 'Edit'}</span>
+                        <span>{'Edit'}</span>
                       </button>
                     </div>
 
@@ -2043,20 +2244,18 @@ export const CalendarView: React.FC = () => {
                         onClick={() => setIsCancelConfirmOpen(true)}
                         className="text-xs font-semibold text-slate-500 hover:text-amber-600 transition"
                       >
-                        {isNl ? 'Afspraak Annuleren' : 'Cancel Booking'}
+                        {'Cancel Booking'}
                       </button>
                       <button
                         type="button"
                         onClick={handleDeleteAppointment}
                         className="flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 transition"
                         title={
-                          isNl
-                            ? 'Afspraak definitief verwijderen uit kalender en database'
-                            : 'Permanently delete appointment from calendar and database'
+                          'Permanently delete appointment from calendar and database'
                         }
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        <span>{isNl ? 'Verwijderen' : 'Delete'}</span>
+                        <span>{'Delete'}</span>
                       </button>
                     </div>
                   </div>
@@ -2159,22 +2358,20 @@ export const CalendarView: React.FC = () => {
             <div className="space-y-3 text-xs">
               <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 text-amber-950 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-medium">{isNl ? 'Periode:' : 'Period:'}</span>
+                  <span className="text-slate-500 font-medium">{'Period:'}</span>
                   <span className="font-bold text-slate-900">
-                    {formatHumanDate(selectedException.startDate)} {isNl ? 't/m' : 'to'} {formatHumanDate(selectedException.endDate)}
+                    {formatHumanDate(selectedException.startDate)} {'to'} {formatHumanDate(selectedException.endDate)}
                   </span>
                 </div>
                 {selectedException.notes && (
                   <div className="flex items-start justify-between gap-2 pt-1.5 border-t border-amber-200/60">
-                    <span className="text-slate-500 font-medium shrink-0">{isNl ? 'Notitie:' : 'Notes:'}</span>
+                    <span className="text-slate-500 font-medium shrink-0">{'Notes:'}</span>
                     <span className="font-semibold text-right text-slate-800">{selectedException.notes}</span>
                   </div>
                 )}
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                {isNl
-                  ? 'Tijdens deze vakantieperiode is de agenda geblokkeerd en kunnen klanten geen tijdstippen reserveren.'
-                  : 'During this vacation period, the calendar is blocked and clients cannot book appointments.'}
+                {'During this vacation period, the calendar is blocked and clients cannot book appointments.'}
               </p>
             </div>
 
@@ -2188,18 +2385,33 @@ export const CalendarView: React.FC = () => {
                 className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition flex items-center gap-1.5 shadow-2xs"
               >
                 <Trash2 className="h-4 w-4" />
-                <span>{isNl ? 'Vakantie Verwijderen' : 'Delete Vacation'}</span>
+                <span>{'Delete Vacation'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedException(null)}
                 className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs"
               >
-                {isNl ? 'Sluiten' : 'Close'}
+                {'Close'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Group Session Modal */}
+      <CreateGroupSessionModal
+        isOpen={isCreateGroupSessionOpen}
+        onClose={() => setIsCreateGroupSessionOpen(false)}
+        initialDate={currentDateStr}
+      />
+
+      {/* Group Session Details & Management Modal */}
+      {selectedGroupSession && (
+        <GroupSessionDetailsModal
+          session={selectedGroupSession}
+          onClose={() => setSelectedGroupSession(null)}
+        />
       )}
     </div>
   );

@@ -163,6 +163,40 @@ export interface Appointment {
   invoicedAt?: string;
   paidAt?: string;
   invoiceNumber?: string;
+  isGroupSession?: boolean;
+  groupSessionId?: string;
+  groupSessionTitle?: string;
+  maxParticipants?: number;
+}
+
+export interface GroupSessionParticipant {
+  clientId: string;
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  bookedAt: string;
+  appointmentId?: string;
+  packageId?: string;
+  packageName?: string;
+  price: number;
+  status: 'confirmed' | 'cancelled';
+}
+
+export interface GroupSession {
+  id: string;
+  title: string;
+  serviceId?: string;
+  description?: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  durationMinutes: number;
+  maxParticipants: number; // Maximaal aantal deelnemers
+  price: number; // Prijs per deelnemer
+  location?: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  participants: GroupSessionParticipant[];
+  createdAt: string;
 }
 
 export interface TimeSlot {
@@ -274,5 +308,23 @@ export interface InvoiceSettings {
 }
 
 export type UserRole = 'provider' | 'client';
-export type AppLanguage = 'en' | 'nl';
+export type AppLanguage = 'en';
+
+export interface ProBookingBackupData {
+  version: 1;
+  app: 'ProBooking';
+  exportedAt: string; // ISO string
+  language?: string;
+  data: {
+    settings: ProviderSettings;
+    invoiceSettings: InvoiceSettings;
+    clients: Client[];
+    appointments: Appointment[];
+    packages: ServicePackage[];
+    clientPackages: ClientPackage[];
+    groupSessions?: GroupSession[];
+    invoices: Invoice[];
+    messages?: ChatMessage[];
+  };
+}
 

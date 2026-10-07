@@ -264,11 +264,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             <Megaphone className="h-4 w-4 text-emerald-600" />
             <span>
               {selectedClientIds.length > 0
-                ? language === 'nl'
-                  ? `Groepsbericht (${selectedClientIds.length})`
-                  : `Bulk Message (${selectedClientIds.length})`
-                : language === 'nl'
-                ? 'Groepsbericht'
+                ? `Bulk Message (${selectedClientIds.length})`
                 : 'Bulk Message'}
             </span>
           </button>
@@ -292,18 +288,12 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             </span>
             <div>
               <span className="text-xs font-bold block">
-                {language === 'nl'
-                  ? `${selectedClientIds.length} ${
-                      selectedClientIds.length === 1 ? 'klant' : 'klanten'
-                    } geselecteerd`
-                  : `${selectedClientIds.length} ${
+                {`${selectedClientIds.length} ${
                       selectedClientIds.length === 1 ? 'client' : 'clients'
                     } selected`}
               </span>
               <span className="text-[11px] text-slate-400">
-                {language === 'nl'
-                  ? 'Stuur een gezamenlijke mededeling (bijv. vakantiesluiting of beleidswijziging)'
-                  : 'Send a broadcast chat message (e.g. holiday closure or policy update)'}
+                {'Send a broadcast chat message (e.g. holiday closure or policy update)'}
               </span>
             </div>
           </div>
@@ -316,14 +306,14 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               }
               className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition cursor-pointer"
             >
-              {language === 'nl' ? 'Selecteer alles' : 'Select all'} ({displayedClients.length})
+              {'Select all'} ({displayedClients.length})
             </button>
             <button
               type="button"
               onClick={() => setSelectedClientIds([])}
               className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 transition cursor-pointer"
             >
-              {language === 'nl' ? 'Wissen' : 'Clear'}
+              {'Clear'}
             </button>
             <button
               type="button"
@@ -332,7 +322,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             >
               <Megaphone className="h-3.5 w-3.5" />
               <span>
-                {language === 'nl' ? 'Bericht Sturen' : 'Send Message'}
+                {'Send Message'}
               </span>
             </button>
           </div>
@@ -441,9 +431,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                           : 'border-slate-300 bg-slate-50 hover:border-emerald-500'
                       }`}
                       title={
-                        language === 'nl'
-                          ? 'Selecteer klant voor groepsbericht'
-                          : 'Select client for bulk message'
+                        'Select client for bulk message'
                       }
                     >
                       {isClientSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
@@ -454,15 +442,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                           {client.name}
                         </h3>
                       {client.customHourlyRate && (
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200" title={language === 'nl' ? 'Afwijkend uurtarief' : 'Custom override rate'}>
+                        <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200" title={'Custom override rate'}>
                           {formatPrice(client.customHourlyRate)}/h{' '}
                           <span className="font-normal opacity-80">
                             ({(client.customHourlyRateIncludesVat ?? settings.ratesIncludeVat ?? true)
-                              ? language === 'nl'
-                                ? 'incl. BTW'
-                                : 'incl. VAT'
-                              : language === 'nl'
-                              ? 'excl. BTW'
+                              ? 'incl. VAT'
                               : 'excl. VAT'})
                           </span>
                         </span>
@@ -471,19 +455,13 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                         <span
                           className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200"
                           title={
-                            language === 'nl'
-                              ? `${totalRemainingSessions} open sessies in actief pakket`
-                              : `${totalRemainingSessions} open sessions in active package`
+                            `${totalRemainingSessions} open sessions in active package`
                           }
                         >
                           <PackageIcon className="h-3 w-3 text-indigo-600" />
                           <span>
                             {totalRemainingSessions}{' '}
-                            {language === 'nl'
-                              ? totalRemainingSessions === 1
-                                ? 'sessie open'
-                                : 'sessies open'
-                              : totalRemainingSessions === 1
+                            {totalRemainingSessions === 1
                               ? 'session open'
                               : 'sessions open'}
                           </span>
@@ -491,10 +469,10 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 rounded-lg bg-slate-100/70 px-2 py-0.5 text-[10px] font-medium text-slate-400 border border-slate-200"
-                          title={language === 'nl' ? 'Geen actief pakket' : 'No active package'}
+                          title={'No active package'}
                         >
                           <PackageIcon className="h-3 w-3 text-slate-400" />
-                          <span>{language === 'nl' ? 'Geen pakket' : 'No package'}</span>
+                          <span>{'No package'}</span>
                         </span>
                       )}
                     </div>
@@ -508,9 +486,9 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   </div>
 
                   {bdayInfo.isSoon && (
-                    <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800" title={language === 'nl' ? 'Bijna jarig!' : 'Birthday coming up!'}>
+                    <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800" title={'Birthday coming up!'}>
                       <Cake className="h-3 w-3 text-amber-600" />
-                      {bdayInfo.daysAway === 0 ? (language === 'nl' ? 'Vandaag!' : 'Today!') : `${bdayInfo.daysAway}d`}
+                      {bdayInfo.daysAway === 0 ? ('Today!') : `${bdayInfo.daysAway}d`}
                     </span>
                   )}
                 </div>
@@ -558,7 +536,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                           <PackageIcon className="h-3.5 w-3.5" />
                         </div>
                         <span className="text-xs font-bold text-slate-800">
-                          {language === 'nl' ? 'Pakket & Rittenkaart' : 'Package & Session Pass'}
+                          {'Package & Session Pass'}
                         </span>
                       </div>
 
@@ -566,11 +544,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                         {totalRemainingSessions > 0 && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
                             {totalRemainingSessions}{' '}
-                            {language === 'nl'
-                              ? totalRemainingSessions === 1
-                                ? 'open sessie'
-                                : 'open sessies'
-                              : totalRemainingSessions === 1
+                            {totalRemainingSessions === 1
                               ? 'session open'
                               : 'sessions open'}
                           </span>
@@ -579,10 +553,10 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                           type="button"
                           onClick={() => handleOpenGrantModal(client)}
                           className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/70 px-2 py-0.5 rounded-lg transition cursor-pointer"
-                          title={language === 'nl' ? 'Pakket toekennen' : 'Grant package'}
+                          title={'Grant package'}
                         >
                           <Plus className="h-3 w-3" />
-                          <span>{language === 'nl' ? 'Pakket' : 'Package'}</span>
+                          <span>{'Package'}</span>
                         </button>
                       </div>
                     </div>
@@ -610,7 +584,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                                   {cp.packageName}
                                 </span>
                                 <span className="shrink-0 text-xs font-black text-indigo-700 ml-1">
-                                  {Number(cp.remainingSessions.toFixed(2))} / {cp.totalSessions} {language === 'nl' ? 'open' : 'left'}
+                                  {Number(cp.remainingSessions.toFixed(2))} / {cp.totalSessions} {'left'}
                                 </span>
                               </div>
 
@@ -626,9 +600,9 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
                               <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 flex-wrap gap-1">
                                 <span>
-                                  {Number((cp.totalSessions - cp.remainingSessions).toFixed(2))} {language === 'nl' ? 'verbruikt' : 'used'} •{' '}
+                                  {Number((cp.totalSessions - cp.remainingSessions).toFixed(2))} {'used'} •{' '}
                                   <strong className="text-slate-800 font-semibold">
-                                    {Number(cp.remainingSessions.toFixed(2))} {language === 'nl' ? 'open' : 'remaining'}
+                                    {Number(cp.remainingSessions.toFixed(2))} {'remaining'}
                                   </strong>
                                 </span>
                                 {cp.expiresAt ? (
@@ -648,14 +622,14 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     ) : (
                       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-2.5 text-center text-xs text-slate-500 flex items-center justify-between gap-2">
                         <span className="text-[11px] text-slate-400">
-                          {language === 'nl' ? 'Geen actief pakket' : 'No active package'}
+                          {'No active package'}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleOpenGrantModal(client)}
                           className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition underline underline-offset-2 cursor-pointer"
                         >
-                          {language === 'nl' ? '+ Pakket toekennen' : '+ Grant package'}
+                          {'+ Grant package'}
                         </button>
                       </div>
                     )}
@@ -742,9 +716,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                           : 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100'
                       }`}
                       title={
-                        language === 'nl'
-                          ? `Te factureren overzicht voor ${client.name}`
-                          : `Billing overview for ${client.name}`
+                        `Billing overview for ${client.name}`
                       }
                     >
                       <Receipt className="h-3.5 w-3.5 text-amber-600" />
@@ -835,7 +807,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder={language === 'nl' ? 'Linda de Vries' : 'Sarah Connor'}
+                  placeholder={'Sarah Connor'}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
@@ -878,7 +850,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder={language === 'nl' ? 'Keizersgracht 100' : '123 Market Street'}
+                  placeholder={'123 Market Street'}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -888,11 +860,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {language === 'nl' ? 'Postcode' : 'Postal Code'}
+                    {'Postal Code'}
                   </label>
                   <input
                     type="text"
-                    placeholder={language === 'nl' ? '1015 AA' : 'EC1A 1BB'}
+                    placeholder={'EC1A 1BB'}
                     value={formData.postalCode}
                     onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -904,7 +876,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder={language === 'nl' ? 'Amsterdam' : 'London'}
+                    placeholder={'London'}
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -931,7 +903,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   <input
                     type="number"
                     step="0.5"
-                    placeholder={`${language === 'nl' ? 'Standaard' : 'Standard'}: ${formatPrice(settings.standardHourlyRate)}`}
+                    placeholder={`${'Standard'}: ${formatPrice(settings.standardHourlyRate)}`}
                     value={formData.customHourlyRate}
                     onChange={(e) => setFormData({ ...formData, customHourlyRate: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -953,7 +925,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                             : 'text-slate-600'
                         }`}
                       >
-                        {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                        {'Excl. VAT'}
                       </span>
                     </label>
                     <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -972,7 +944,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                             : 'text-slate-600'
                         }`}
                       >
-                        {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                        {'Incl. VAT'}
                       </span>
                     </label>
                   </div>
@@ -1101,7 +1073,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                             : 'text-slate-600'
                         }`}
                       >
-                        {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                        {'Excl. VAT'}
                       </span>
                     </label>
                     <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -1120,7 +1092,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                             : 'text-slate-600'
                         }`}
                       >
-                        {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                        {'Incl. VAT'}
                       </span>
                     </label>
                   </div>
@@ -1142,7 +1114,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {language === 'nl' ? 'Postcode' : 'Postal Code'}
+                    {'Postal Code'}
                   </label>
                   <input
                     type="text"
@@ -1263,7 +1235,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    {language === 'nl' ? 'Pakket Toekennen' : 'Grant Package'}
+                    {'Grant Package'}
                   </h3>
                   <p className="text-xs text-slate-500">{grantModalClient.name}</p>
                 </div>
@@ -1279,7 +1251,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             <form onSubmit={handleConfirmGrant} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {language === 'nl' ? 'Selecteer Pakket / Rittenkaart' : 'Select Package / Pass'}
+                  {'Select Package / Pass'}
                 </label>
                 <select
                   value={selectedPackageId}
@@ -1296,7 +1268,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 >
                   {packages.map((pkg) => (
                     <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} ({pkg.sessionCount} {language === 'nl' ? 'sessies' : 'sessions'} • {formatPrice(pkg.price)})
+                      {pkg.name} ({pkg.sessionCount} {'sessions'} • {formatPrice(pkg.price)})
                     </option>
                   ))}
                 </select>
@@ -1304,7 +1276,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {language === 'nl' ? 'Aantal Open Sessies' : 'Number of Open Sessions'}
+                  {'Number of Open Sessions'}
                 </label>
                 <input
                   type="number"
@@ -1315,9 +1287,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-indigo-500 outline-none transition font-medium"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  {language === 'nl'
-                    ? 'Standaard ingesteld op het pakketformaat, maar eventueel handmatig aanpasbaar.'
-                    : 'Defaults to package sessions, but can be customized.'}
+                  {'Defaults to package sessions, but can be customized.'}
                 </p>
               </div>
 
@@ -1334,7 +1304,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
-                  <span>{language === 'nl' ? 'Toekennen aan Klant' : 'Grant to Client'}</span>
+                  <span>{'Grant to Client'}</span>
                 </button>
               </div>
             </form>

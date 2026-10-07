@@ -22,7 +22,7 @@ import {
 export const InvoiceSettingsView: React.FC = () => {
   const { settings, updateSettings, invoiceSettings, updateInvoiceSettings, t, language } = useBooking();
 
-  const buildFormFromSettings = (inv: InvoiceSettings, lang: 'en' | 'nl') => {
+  const buildFormFromSettings = (inv: InvoiceSettings, lang?: string) => {
     const resolvedBizName = !isDemoTrainerName(inv.businessName, settings.email)
       ? inv.businessName
       : !isDemoTrainerName(settings.name, settings.email)
@@ -40,10 +40,8 @@ export const InvoiceSettingsView: React.FC = () => {
 
     const localizedNotes = getLocalizedInvoiceNote(inv.invoiceNotes, lang, resolvedBizName);
     let country = inv.country;
-    if (lang === 'en' && country === 'Nederland') {
+    if (country === 'Nederland') {
       country = 'The Netherlands';
-    } else if (lang === 'nl' && (country === 'Netherlands' || country === 'The Netherlands')) {
-      country = 'Nederland';
     }
     const baseRates =
       Array.isArray(inv.vatRates) && inv.vatRates.length > 0
@@ -210,16 +208,14 @@ export const InvoiceSettingsView: React.FC = () => {
             {t.invoiceSettingsTitle}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            {language === 'nl'
-              ? 'Beheer bedrijfsgegevens, internationale factuurregels en de opvolgende nummering.'
-              : 'Configure company information, legal compliance standards, and sequential invoice formatting.'}
+            {'Configure company information, legal compliance standards, and sequential invoice formatting.'}
           </p>
         </div>
 
         {savedSuccess && (
           <div className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 border border-emerald-200 animate-fade-in">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>{language === 'nl' ? 'Instellingen succesvol opgeslagen!' : 'Settings successfully saved!'}</span>
+            <span>{'Settings successfully saved!'}</span>
           </div>
         )}
       </div>
@@ -250,8 +246,8 @@ export const InvoiceSettingsView: React.FC = () => {
                   }`}
                 >
                   {form.enabled
-                    ? (language === 'nl' ? 'Actief' : 'Active')
-                    : (language === 'nl' ? 'Uitgeschakeld' : 'Disabled')}
+                    ? ('Active')
+                    : ('Disabled')}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 max-w-xl leading-relaxed">
@@ -282,12 +278,10 @@ export const InvoiceSettingsView: React.FC = () => {
             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">
-                {language === 'nl' ? 'Factuurmodule is uitgeschakeld' : 'Invoicing module is disabled'}
+                {'Invoicing module is disabled'}
               </span>
               <p className="text-amber-700 mt-0.5 leading-relaxed">
-                {language === 'nl'
-                  ? 'Je kunt nog steeds voltooide sessies en gekochte pakketten inzien en handmatig markeren. Officiële PDF-factuurgeneratie en archivering zijn momenteel gepauzeerd.'
-                  : 'You can still track delivered sessions and purchased packages. Official PDF generation and numbering are paused.'}
+                {'You can still track delivered sessions and purchased packages. Official PDF generation and numbering are paused.'}
               </p>
             </div>
           </div>
@@ -305,9 +299,7 @@ export const InvoiceSettingsView: React.FC = () => {
               {t.numberFormatLabel}
             </h4>
             <p className="text-[11px] text-slate-500">
-              {language === 'nl'
-                ? 'Facturen moeten volgens de belastingwetgeving opvolgend en sluitend genummerd zijn.'
-                : 'Tax regulations require sequential, gap-free invoice numbering.'}
+              {'Tax regulations require sequential, gap-free invoice numbering.'}
             </p>
           </div>
         </div>
@@ -327,7 +319,7 @@ export const InvoiceSettingsView: React.FC = () => {
               required
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
-              {language === 'nl' ? 'Tags: {YYYY} = jaar, {MM} = maand' : 'Tags: {YYYY} = year, {MM} = month'}
+              {'Tags: {YYYY} = year, {MM} = month'}
             </span>
           </div>
 
@@ -346,7 +338,7 @@ export const InvoiceSettingsView: React.FC = () => {
               required
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
-              {language === 'nl' ? 'Bijv. 4 cijfers = 0001, 0002...' : 'e.g. 4 digits = 0001, 0002...'}
+              {'e.g. 4 digits = 0001, 0002...'}
             </span>
           </div>
 
@@ -364,7 +356,7 @@ export const InvoiceSettingsView: React.FC = () => {
               required
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
-              {language === 'nl' ? 'Wordt automatisch met 1 opgehoogd' : 'Auto-increments upon invoice creation'}
+              {'Auto-increments upon invoice creation'}
             </span>
           </div>
         </div>
@@ -374,7 +366,7 @@ export const InvoiceSettingsView: React.FC = () => {
           <div className="text-xs text-slate-600">
             <span className="font-semibold text-slate-700">{t.nextInvoiceNumberPreview}:</span>
             <span className="text-[11px] text-slate-400 ml-2">
-              ({language === 'nl' ? 'Eerstvolgende nieuwe factuur' : 'Next issued invoice'})
+              ({'Next issued invoice'})
             </span>
           </div>
           <div className="rounded-lg bg-white px-3 py-1.5 font-mono text-sm font-black text-blue-700 border border-blue-200 shadow-2xs">
@@ -387,9 +379,7 @@ export const InvoiceSettingsView: React.FC = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                {language === 'nl'
-                  ? 'Creditnota Prefix Format'
-                  : 'Credit Note Prefix Format'}
+                {'Credit Note Prefix Format'}
               </label>
               <input
                 type="text"
@@ -400,17 +390,13 @@ export const InvoiceSettingsView: React.FC = () => {
                 required
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                {language === 'nl'
-                  ? 'Tags: {YYYY} = jaar, {MM} = maand (bijv. CN-{YYYY}-)'
-                  : 'Tags: {YYYY} = year, {MM} = month (e.g. CN-{YYYY}-)'}
+                {'Tags: {YYYY} = year, {MM} = month (e.g. CN-{YYYY}-)'}
               </span>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                {language === 'nl'
-                  ? 'Volgend Creditnota Volgnummer'
-                  : 'Next Credit Note Sequence #'}
+                {'Next Credit Note Sequence #'}
               </label>
               <input
                 type="number"
@@ -421,9 +407,7 @@ export const InvoiceSettingsView: React.FC = () => {
                 required
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                {language === 'nl'
-                  ? 'Wordt automatisch met 1 opgehoogd bij een nieuwe creditnota'
-                  : 'Auto-increments upon credit note creation'}
+                {'Auto-increments upon credit note creation'}
               </span>
             </div>
           </div>
@@ -431,10 +415,10 @@ export const InvoiceSettingsView: React.FC = () => {
           <div className="rounded-xl bg-rose-50/60 p-3.5 border border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="text-xs text-slate-700">
               <span className="font-semibold text-slate-800">
-                {language === 'nl' ? 'Voorbeeld eerstvolgende creditnota' : 'Next credit note preview'}:
+                {'Next credit note preview'}:
               </span>
               <span className="text-[11px] text-slate-500 ml-2">
-                ({language === 'nl' ? 'Automatische tegenboeking' : 'Automated reversal'})
+                ({'Automated reversal'})
               </span>
             </div>
             <div className="rounded-lg bg-white px-3 py-1.5 font-mono text-sm font-black text-rose-700 border border-rose-200 shadow-2xs">
@@ -452,12 +436,10 @@ export const InvoiceSettingsView: React.FC = () => {
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900">
-              {language === 'nl' ? 'Bedrijfsgegevens & Fiscale Registratie' : 'Business & Tax Registration'}
+              {'Business & Tax Registration'}
             </h4>
             <p className="text-[11px] text-slate-500">
-              {language === 'nl'
-                ? 'Verplichte leveranciersgegevens conform de Europese factuurrichtlijnen.'
-                : 'Mandatory supplier details conforming to EU and international invoicing rules.'}
+              {'Mandatory supplier details conforming to EU and international invoicing rules.'}
             </p>
           </div>
         </div>
@@ -482,7 +464,7 @@ export const InvoiceSettingsView: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">
               {t.cocLabel}{' '}
               <span className="font-normal text-slate-400">
-                ({language === 'nl' ? 'optioneel' : 'optional'})
+                ({'optional'})
               </span>
             </label>
             <input
@@ -490,19 +472,13 @@ export const InvoiceSettingsView: React.FC = () => {
               value={form.chamberOfCommerce}
               onChange={(e) => handleChange('chamberOfCommerce', e.target.value)}
               placeholder={
-                language === 'nl'
-                  ? 'Leeg laten indien niet van toepassing'
-                  : 'Leave empty if not applicable'
+                'Leave empty if not applicable'
               }
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-900 font-mono focus:border-blue-500 focus:bg-white outline-none"
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
               {form.chamberOfCommerce.trim()
-                ? language === 'nl'
-                  ? `Wordt op factuur vermeld als: ${form.chamberOfCommerce.trim()}`
-                  : `Displayed on invoice as: ${form.chamberOfCommerce.trim()}`
-                : language === 'nl'
-                ? 'Op de factuur komt te staan: KVK: Niet van toepassing'
+                ? `Displayed on invoice as: ${form.chamberOfCommerce.trim()}`
                 : 'Invoice will state: CoC: Not applicable'}
             </span>
           </div>
@@ -512,7 +488,7 @@ export const InvoiceSettingsView: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">
               {t.taxIdLabel}{' '}
               <span className="font-normal text-slate-400">
-                ({language === 'nl' ? 'optioneel' : 'optional'})
+                ({'optional'})
               </span>
             </label>
             <input
@@ -520,19 +496,13 @@ export const InvoiceSettingsView: React.FC = () => {
               value={form.taxId}
               onChange={(e) => handleChange('taxId', e.target.value)}
               placeholder={
-                language === 'nl'
-                  ? 'Leeg laten indien niet van toepassing'
-                  : 'Leave empty if not applicable'
+                'Leave empty if not applicable'
               }
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-900 font-mono focus:border-blue-500 focus:bg-white outline-none"
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
               {hasTaxId
-                ? language === 'nl'
-                  ? `Wordt op factuur vermeld als: ${form.taxId.trim()}`
-                  : `Displayed on invoice as: ${form.taxId.trim()}`
-                : language === 'nl'
-                ? 'Zonder BTW-nummer: "Niet van toepassing" & BTW-regime altijd vrijgesteld'
+                ? `Displayed on invoice as: ${form.taxId.trim()}`
                 : 'Without VAT ID: "Not applicable" & VAT regime always exempt'}
             </span>
           </div>
@@ -556,7 +526,7 @@ export const InvoiceSettingsView: React.FC = () => {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                {language === 'nl' ? 'Postcode' : 'Postal Code'}
+                {'Postal Code'}
               </label>
               <input
                 type="text"
@@ -619,12 +589,10 @@ export const InvoiceSettingsView: React.FC = () => {
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900">
-              {language === 'nl' ? 'Bankrekening & Betalingsinstructies' : 'Banking & Payment Instructions'}
+              {'Banking & Payment Instructions'}
             </h4>
             <p className="text-[11px] text-slate-500">
-              {language === 'nl'
-                ? 'Deze betaalgegevens worden op de officiële PDF-factuur getoond aan de klant.'
-                : 'Bank details printed on the official invoice for client transfers.'}
+              {'Bank details printed on the official invoice for client transfers.'}
             </p>
           </div>
         </div>
@@ -712,30 +680,24 @@ export const InvoiceSettingsView: React.FC = () => {
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-900 font-bold focus:border-blue-500 focus:bg-white outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="exempt">
-                {language === 'nl'
-                  ? 'Vrijgesteld van BTW (Geen BTW-ondernemer / vrijstelling)'
-                  : 'Exempt from VAT (No VAT registration / exemption)'}
+                {'Exempt from VAT (No VAT registration / exemption)'}
               </option>
               {hasTaxId &&
                 availableVatRates.map((rate) => (
                   <option key={rate} value={String(rate)}>
                     {rate === 0
-                      ? language === 'nl'
-                        ? '0% BTW (Nultarief voor belaste goederen/diensten)'
-                        : '0% VAT (Zero-rated goods/services)'
+                      ? '0% VAT (Zero-rated goods/services)'
                       : rate === 21
-                      ? `21% BTW (${language === 'nl' ? 'Standaard hoog' : 'Standard 21%'})`
+                      ? `21% BTW (${'Standard 21%'})`
                       : rate === 9
-                      ? `9% BTW (${language === 'nl' ? 'Verlaagd tarief' : 'Reduced 9%'})`
-                      : `${rate}% BTW (${language === 'nl' ? 'Eigen BTW-tarief' : 'Custom VAT rate'})`}
+                      ? `9% BTW (${'Reduced 9%'})`
+                      : `${rate}% BTW (${'Custom VAT rate'})`}
                   </option>
                 ))}
             </select>
             {!hasTaxId && (
               <span className="text-[10px] font-semibold text-amber-700 mt-1 block">
-                {language === 'nl'
-                  ? 'Zonder BTW-nummer is het BTW-regime automatisch Vrijgesteld van BTW.'
-                  : 'Without a VAT ID, the VAT regime is automatically Exempt from VAT.'}
+                {'Without a VAT ID, the VAT regime is automatically Exempt from VAT.'}
               </span>
             )}
           </div>
@@ -747,14 +709,10 @@ export const InvoiceSettingsView: React.FC = () => {
             <div>
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Percent className="h-3.5 w-3.5 text-blue-600" />
-                {language === 'nl'
-                  ? 'BTW-tarieven & Vrijstelling beheren'
-                  : 'Manage VAT Rates & Exemption'}
+                {'Manage VAT Rates & Exemption'}
               </span>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {language === 'nl'
-                  ? 'Kies tussen "Vrijgesteld van BTW" (geen BTW-nummer/vrijstelling), "0% BTW" (nultarief) of een BTW-percentage.'
-                  : 'Choose between "Exempt from VAT" (no VAT ID/exemption), "0% VAT" (zero rate), or a VAT percentage.'}
+                {'Choose between "Exempt from VAT" (no VAT ID/exemption), "0% VAT" (zero rate), or a VAT percentage.'}
               </p>
             </div>
 
@@ -773,7 +731,7 @@ export const InvoiceSettingsView: React.FC = () => {
                       handleAddCustomVatRate();
                     }
                   }}
-                  placeholder={language === 'nl' ? 'Bijv. 19 of 6' : 'e.g. 19 or 6'}
+                  placeholder={'e.g. 19 or 6'}
                   className="w-32 rounded-xl border border-slate-200 bg-white pl-2.5 pr-6 py-1.5 text-xs font-mono font-bold text-slate-900 focus:border-blue-500 outline-none"
                 />
                 <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
@@ -787,7 +745,7 @@ export const InvoiceSettingsView: React.FC = () => {
                 className="flex items-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 px-3 py-1.5 text-xs font-bold text-white transition cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{language === 'nl' ? 'Toevoegen' : 'Add'}</span>
+                <span>{'Add'}</span>
               </button>
             </div>
           </div>
@@ -809,12 +767,10 @@ export const InvoiceSettingsView: React.FC = () => {
                 }}
                 className="cursor-pointer"
                 title={
-                  language === 'nl'
-                    ? 'Stel in op Vrijgesteld van BTW (geen BTW-ondernemer / vrijstelling)'
-                    : 'Set as Exempt from VAT'
+                  'Set as Exempt from VAT'
                 }
               >
-                {language === 'nl' ? 'Vrijgesteld van BTW' : 'Exempt from VAT'}
+                {'Exempt from VAT'}
               </button>
             </div>
 
@@ -845,18 +801,12 @@ export const InvoiceSettingsView: React.FC = () => {
                     className={isDisabledRate ? 'cursor-not-allowed' : 'cursor-pointer'}
                     title={
                       isDisabledRate
-                        ? language === 'nl'
-                          ? 'Vul eerst een BTW-nummer in om een BTW-tarief (zoals 0%, 9% of 21%) te selecteren'
-                          : 'Enter a VAT ID first to select a VAT rate (such as 0%, 9%, or 21%)'
-                        : language === 'nl'
-                        ? `Klik om ${rate}% BTW als standaard in te stellen`
+                        ? 'Enter a VAT ID first to select a VAT rate (such as 0%, 9%, or 21%)'
                         : `Click to set ${rate}% VAT as default`
                     }
                   >
                     {rate === 0
-                      ? language === 'nl'
-                        ? '0% BTW'
-                        : '0% VAT'
+                      ? '0% VAT'
                       : `${rate}% BTW`}
                   </button>
                   {availableVatRates.length > 1 && rate !== 0 && (
@@ -865,9 +815,7 @@ export const InvoiceSettingsView: React.FC = () => {
                       onClick={() => handleDeleteVatRate(rate)}
                       className="ml-0.5 rounded-md p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition cursor-pointer"
                       title={
-                        language === 'nl'
-                          ? `BTW-tarief ${rate}% verwijderen`
-                          : `Delete ${rate}% VAT rate`
+                        `Delete ${rate}% VAT rate`
                       }
                     >
                       <X className="h-3 w-3" />
@@ -885,16 +833,10 @@ export const InvoiceSettingsView: React.FC = () => {
             <div>
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Percent className="h-3.5 w-3.5 text-emerald-600" />
-                {language === 'nl'
-                  ? 'Uurtarieven BTW-berekening (Exclusief of Inclusief BTW)'
-                  : 'Hourly Rates VAT Calculation (Excl. or Incl. VAT)'}
+                {'Hourly Rates VAT Calculation (Excl. or Incl. VAT)'}
               </span>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {language === 'nl'
-                  ? (settings.ratesIncludeVat ?? true) === false
-                    ? 'Exclusief BTW: het ingestelde uurtarief is netto; op de factuur komt de BTW hier bovenop.'
-                    : 'Inclusief BTW: de BTW zit al in het ingestelde uurtarief inbegrepen op de factuur.'
-                  : (settings.ratesIncludeVat ?? true) === false
+                {(settings.ratesIncludeVat ?? true) === false
                   ? 'Excl. VAT: the configured hourly rate is net; VAT is added on top on the invoice.'
                   : 'Incl. VAT: VAT is already included in the configured hourly rate on the invoice.'}
               </p>
@@ -919,7 +861,7 @@ export const InvoiceSettingsView: React.FC = () => {
                       : 'text-slate-600'
                   }`}
                 >
-                  {language === 'nl' ? 'Exclusief BTW' : 'Excl. VAT'}
+                  {'Excl. VAT'}
                 </span>
               </label>
 
@@ -941,7 +883,7 @@ export const InvoiceSettingsView: React.FC = () => {
                       : 'text-slate-600'
                   }`}
                 >
-                  {language === 'nl' ? 'Inclusief BTW' : 'Incl. VAT'}
+                  {'Incl. VAT'}
                 </span>
               </label>
             </div>
@@ -954,7 +896,7 @@ export const InvoiceSettingsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <Percent className="h-4 w-4 text-emerald-600" />
               <span className="text-xs font-bold text-slate-800">
-                {t.vatExempt} ({language === 'nl' ? 'Vrijgesteld van BTW' : 'Exempt from VAT'})
+                {t.vatExempt} ({'Exempt from VAT'})
               </span>
             </div>
             <label
@@ -963,9 +905,7 @@ export const InvoiceSettingsView: React.FC = () => {
               }`}
               title={
                 !hasTaxId
-                  ? language === 'nl'
-                    ? 'Zonder BTW-nummer is het BTW-regime altijd vrijgesteld'
-                    : 'Without a VAT ID, the VAT regime is always exempt'
+                  ? 'Without a VAT ID, the VAT regime is always exempt'
                   : undefined
               }
             >
@@ -987,20 +927,14 @@ export const InvoiceSettingsView: React.FC = () => {
             </label>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            {language === 'nl'
-              ? 'Vrijgesteld van BTW geldt wanneer de dienstverlener geen ondernemer voor de BTW is en geen BTW-nummer heeft (of vrijgestelde prestaties levert). Voor belaste goederen of diensten tegen 0% kies je hierboven het tarief "0% BTW".'
-              : 'Exempt from VAT applies when the provider is not a VAT entrepreneur and has no VAT ID (or provides exempt services). For goods or services taxed at 0%, select "0% VAT" above.'}
+            {'Exempt from VAT applies when the provider is not a VAT entrepreneur and has no VAT ID (or provides exempt services). For goods or services taxed at 0%, select "0% VAT" above.'}
           </p>
           {(!hasTaxId || form.isVatExempt) && (
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-lg border border-emerald-200">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
               <span>
                 {!hasTaxId
-                  ? language === 'nl'
-                    ? 'Actief (Geen BTW-nummer): Zonder BTW-nummer kan er geen BTW op de factuur worden berekend en is het BTW-regime altijd vrijgesteld.'
-                    : 'Active (No VAT ID): Without a VAT number, no VAT can be calculated on the invoice and the VAT regime is always exempt.'
-                  : language === 'nl'
-                  ? 'Actief: Op facturen wordt geen BTW berekend en staat de vermelding "Vrijgesteld van omzetbelasting (BTW)".'
+                  ? 'Active (No VAT ID): Without a VAT number, no VAT can be calculated on the invoice and the VAT regime is always exempt.'
                   : 'Active: Invoices will have no VAT calculated and state "Exempt from value added tax (VAT)".'}
               </span>
             </div>

@@ -305,11 +305,11 @@ export const PackageManagement: React.FC = () => {
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                        {pkg.sessionCount} {language === 'nl' ? 'Sessies' : 'Sessions'}
+                        {pkg.sessionCount} {'Sessions'}
                       </span>
                       <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200 flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {stdDuration} min / {language === 'nl' ? 'sessie' : 'session'}
+                        {stdDuration} min / {'session'}
                       </span>
                       {pkg.featured && (
                         <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200 flex items-center gap-1">
@@ -357,10 +357,10 @@ export const PackageManagement: React.FC = () => {
                   <div className="mt-4 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-medium text-slate-400">
-                        {language === 'nl' ? 'Standaard sessieduur:' : 'Standard session:'}
+                        {'Standard session:'}
                       </span>
                       <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                        {stdDuration} min ({language === 'nl' ? '1 sessie' : '1 session credit'})
+                        {stdDuration} min ({'1 session credit'})
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -377,9 +377,7 @@ export const PackageManagement: React.FC = () => {
                       <>
                         <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         <span className="text-slate-500">
-                          {language === 'nl'
-                            ? `${pkg.validityDays} dagen geldig na aankoop`
-                            : `Valid for ${pkg.validityDays} days from purchase`}
+                          {`Valid for ${pkg.validityDays} days from purchase`}
                         </span>
                       </>
                     ) : (
@@ -502,7 +500,7 @@ export const PackageManagement: React.FC = () => {
                         <td className="px-5 py-4">
                           <span className="font-semibold text-slate-800">{cp.packageName}</span>
                           <span className="block text-[11px] text-slate-400">
-                            {formatPrice(cp.pricePaid)} paid • 1 {language === 'nl' ? 'sessie' : 'session'} = {stdDur}m
+                            {formatPrice(cp.pricePaid)} paid • 1 {'session'} = {stdDur}m
                           </span>
                         </td>
                         <td className="px-5 py-4">
@@ -576,7 +574,7 @@ export const PackageManagement: React.FC = () => {
                             <button
                               onClick={() => deleteClientPackage(cp.id)}
                               className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition"
-                              title={language === 'nl' ? 'Pakket verwijderen' : 'Delete client package'}
+                              title={'Delete client package'}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -702,9 +700,7 @@ export const PackageManagement: React.FC = () => {
                   <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5 text-emerald-600" />
                     <span>
-                      {language === 'nl'
-                        ? 'Standaard sessieduur van dit pakket (minuten) *'
-                        : 'Standard Session Duration (minutes) *'}
+                      {'Standard Session Duration (minutes) *'}
                     </span>
                   </label>
                 </div>
@@ -737,26 +733,18 @@ export const PackageManagement: React.FC = () => {
                         }`}
                       >
                         {mins === 60
-                          ? language === 'nl'
-                            ? '60m (1 uur)'
-                            : '60m (1 hr)'
+                          ? '60m (1 hr)'
                           : mins === 90
-                          ? language === 'nl'
-                            ? '90m (1,5u)'
-                            : '90m (1.5h)'
+                          ? '90m (1.5h)'
                           : mins === 120
-                          ? language === 'nl'
-                            ? '120m (2u)'
-                            : '120m (2h)'
+                          ? '120m (2h)'
                           : `${mins}m`}
                       </button>
                     ))}
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-snug">
-                  {language === 'nl'
-                    ? `1 sessie = ${Number(formData.sessionDurationMinutes) || 60} min. Bij het plannen van een sessie van ${Math.round((Number(formData.sessionDurationMinutes) || 60) / 2)} min wordt 0,5 sessie afgeschreven; bij ${Math.round((Number(formData.sessionDurationMinutes) || 60) * 1.5)} min wordt 1,5 sessie afgeschreven.`
-                    : `1 session = ${Number(formData.sessionDurationMinutes) || 60} min. Booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) / 2)}-min session deducts 0.5 session; booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) * 1.5)}-min session deducts 1.5 sessions.`}
+                  {`1 session = ${Number(formData.sessionDurationMinutes) || 60} min. Booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) / 2)}-min session deducts 0.5 session; booking a ${Math.round((Number(formData.sessionDurationMinutes) || 60) * 1.5)}-min session deducts 1.5 sessions.`}
                 </p>
               </div>
 
@@ -814,12 +802,12 @@ export const PackageManagement: React.FC = () => {
                         className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-emerald-500 focus:outline-hidden"
                       />
                       <span className="text-xs text-slate-500 shrink-0 font-medium">
-                        {language === 'nl' ? 'dagen' : 'days'}
+                        {'days'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] text-slate-400 font-medium">
-                        {language === 'nl' ? 'Snel kiezen:' : 'Presets:'}
+                        {'Presets:'}
                       </span>
                       {[30, 60, 90, 180, 365].map((days) => (
                         <button
@@ -833,10 +821,8 @@ export const PackageManagement: React.FC = () => {
                           }`}
                         >
                           {days === 365
-                            ? language === 'nl'
-                              ? '1 jaar (365d)'
-                              : '1 year (365d)'
-                            : `${days} ${language === 'nl' ? 'dg' : 'd'}`}
+                            ? '1 year (365d)'
+                            : `${days} ${'d'}`}
                         </button>
                       ))}
                     </div>

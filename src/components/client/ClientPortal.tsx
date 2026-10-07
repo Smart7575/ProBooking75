@@ -34,9 +34,11 @@ import {
   X,
   ShieldAlert,
   Receipt,
+  Users,
 } from 'lucide-react';
 import { ClientChatTab } from './ClientChatTab';
 import { ClientBillingTab } from './ClientBillingTab';
+import { BookGroupSessionModal } from './BookGroupSessionModal';
 import { getMagicLinkDetails } from '../../utils/urlUtils';
 import {
   formatDateISO,
@@ -48,7 +50,7 @@ import {
   isCancellationAllowed,
   minutesToTime,
 } from '../../utils/dateUtils';
-import { ServiceType, TimeSlot, Appointment, ClientPackage, ServicePackage } from '../../types';
+import { ServiceType, TimeSlot, Appointment, ClientPackage, ServicePackage, GroupSession } from '../../types';
 import { SupportedCurrency, CURRENCY_OPTIONS } from '../../utils/currencyUtils';
 
 export const ClientPortal: React.FC = () => {
@@ -61,6 +63,10 @@ export const ClientPortal: React.FC = () => {
     settings,
     services,
     appointments,
+    groupSessions,
+    cancelGroupSessionSpot,
+    isClientInGroupSession,
+    getGroupSessionSpotsLeft,
     packages,
     clientPackages,
     getClientActivePackages,
@@ -85,8 +91,19 @@ export const ClientPortal: React.FC = () => {
     language,
   } = useBooking();
 
-  // Navigation tab in Client Portal: 'book' | 'appointments' | 'packages' | 'billing' | 'chat' | 'profile'
-  const [activeTab, setActiveTab] = useState<'book' | 'appointments' | 'packages' | 'billing' | 'chat' | 'profile'>('book');
+  // Navigation tab in Client Portal: 'book' | 'groups' | 'appointments' | 'packages' | 'billing' | 'chat' | 'profile'
+  const [activeTab, setActiveTab] = useState<
+    'book' | 'groups' | 'appointments' | 'packages' | 'billing' | 'chat' | 'profile'
+  >('book');
+
+  // Group Session Booking modal & notification states
+  const [selectedGroupSessionToBook, setSelectedGroupSessionToBook] = useState<GroupSession | null>(
+    null
+  );
+  const [groupSessionSuccessMsg, setGroupSessionSuccessMsg] = useState<string | null>(null);
+  const [groupSessionFilter, setGroupSessionFilter] = useState<'all' | 'open' | 'registered'>(
+    'all'
+  );
 
   // Booking Flow Steps (1 = Service, 2 = Date & Slot, 3 = Confirmation)
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -225,6 +242,27 @@ export const ClientPortal: React.FC = () => {
       (a) => a.status !== 'reserved' || a.date < todayStr
     );
   }, [clientAppointments, todayStr]);
+
+  // Compute upcoming group sessions
+  const upcomingGroupSessions = useMemo(() => {
+    return (groupSessions || [])
+      .filter((gs) => gs.status === 'scheduled' && gs.date >= todayStr)
+      .sort((a, b) =>
+        a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date)
+      );
+  }, [groupSessions, todayStr]);
+
+  const myRegisteredGroupSessionsCount = useMemo(() => {
+    if (!currentClient) return 0;
+    return (groupSessions || []).filter(
+      (gs) =>
+        gs.status === 'scheduled' &&
+        gs.date >= todayStr &&
+        (gs.participants || []).some(
+          (p) => p.clientId === currentClient.id && p.status === 'confirmed'
+        )
+    ).length;
+  }, [groupSessions, currentClient, todayStr]);
 
   // Client's own purchased packages
   const myClientPackages = useMemo(() => {
@@ -388,7 +426,7 @@ export const ClientPortal: React.FC = () => {
   if (!currentClient) {
     return (
       <div className="p-12 text-center text-slate-500">
-        {language === 'nl' ? 'Geen klantprofiel gevonden.' : 'No client profile found.'}
+        {'No client profile found.'}
       </div>
     );
   }
@@ -404,14 +442,10 @@ export const ClientPortal: React.FC = () => {
             </div>
             <div className="text-xs">
               <span className="font-bold text-white block">
-                {language === 'nl'
-                  ? `Testmodus Klantportaal: ${currentClient.name}`
-                  : `Client Portal Test Mode: ${currentClient.name}`}
+                {`Client Portal Test Mode: ${currentClient.name}`}
               </span>
               <span className="text-slate-400 text-[11px]">
-                {language === 'nl'
-                  ? 'Je bekijkt dit portaal als trainer. Echte klanten zien deze balk niet.'
-                  : 'You are previewing this portal as trainer. Real clients do not see this bar.'}
+                {'You are previewing this portal as trainer. Real clients do not see this bar.'}
               </span>
             </div>
           </div>
@@ -422,7 +456,7 @@ export const ClientPortal: React.FC = () => {
           >
             <ChevronLeft className="h-4 w-4" />
             <span>
-              {language === 'nl' ? 'Terug naar Trainer Dashboard' : 'Back to Trainer Dashboard'}
+              {'Back to Trainer Dashboard'}
             </span>
           </button>
         </div>
@@ -437,7 +471,7 @@ export const ClientPortal: React.FC = () => {
             </div>
             <div className="text-xs">
               <span className="font-bold text-white block">
-                {language === 'nl' ? 'Afspraak geannuleerd' : 'Appointment cancelled'}
+                {'Appointment cancelled'}
               </span>
               <span className="text-emerald-300">
                 {cancelSuccessNotification}
@@ -455,12 +489,12 @@ export const ClientPortal: React.FC = () => {
               }}
               className="rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 transition cursor-pointer"
             >
-              {language === 'nl' ? 'Nieuwe afspraak boeken' : 'Book new appointment'}
+              {'Book new appointment'}
             </button>
             <button
               onClick={() => setCancelSuccessNotification(null)}
               className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
-              title={language === 'nl' ? 'Sluiten' : 'Close'}
+              title={'Close'}
             >
               <X className="h-4 w-4" />
             </button>
@@ -484,15 +518,15 @@ export const ClientPortal: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {language === 'nl' ? 'Trainer:' : 'Trainer:'} <strong className="text-slate-200">{settings.name}</strong> •{' '}
+              {'Trainer:'} <strong className="text-slate-200">{settings.name}</strong> •{' '}
               {settings.profession}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Main Tab Navigation: 6 Core Views */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 rounded-2xl bg-slate-100 p-1.5 border border-slate-200/80 text-xs font-bold">
+      {/* Main Tab Navigation: 7 Core Views */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1 rounded-2xl bg-slate-100 p-1.5 border border-slate-200/80 text-xs font-bold">
         <button
           onClick={() => setActiveTab('profile')}
           className={`rounded-xl py-2.5 transition flex items-center justify-center gap-2 ${
@@ -519,6 +553,23 @@ export const ClientPortal: React.FC = () => {
         >
           <CalendarCheck className="h-4 w-4 text-emerald-600" />
           <span>{t.portalNavBook}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('groups')}
+          className={`rounded-xl py-2.5 transition flex items-center justify-center gap-2 relative ${
+            activeTab === 'groups'
+              ? 'bg-white text-slate-950 shadow-xs'
+              : 'text-slate-600 hover:text-slate-950'
+          }`}
+        >
+          <Users className="h-4 w-4 text-purple-600" />
+          <span>{'Group Sessions'}</span>
+          {upcomingGroupSessions.length > 0 && (
+            <span className="rounded-full bg-purple-100 text-purple-800 px-1.5 py-0.2 text-[10px]">
+              {upcomingGroupSessions.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -655,7 +706,38 @@ export const ClientPortal: React.FC = () => {
 
           {/* STEP 1: Select Service */}
           {step === 1 && (
-            <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xl shadow-slate-200/50 space-y-4">
+            <div className="space-y-4">
+              {/* Group Sessions Callout Banner */}
+              {upcomingGroupSessions.length > 0 && (
+                <div className="rounded-2xl border border-purple-200/80 bg-gradient-to-r from-purple-50 via-indigo-50 to-white p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-2xs">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                        <span>{'Prefer training with a group?'}</span>
+                        <span className="rounded-full bg-purple-200 text-purple-900 px-2 py-0.2 text-[10px] font-extrabold">
+                          {upcomingGroupSessions.length} {'available'}
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {'Check our Small Group Strength & Bootcamp sessions with limited capacity.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('groups')}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2 transition shadow-xs shrink-0 cursor-pointer"
+                  >
+                    <span>{'View Group Sessions'}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xl shadow-slate-200/50 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 tracking-tight">
                   Choose a Service
@@ -720,12 +802,10 @@ export const ClientPortal: React.FC = () => {
                           {hasPackageCover ? (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                                {language === 'nl'
-                                  ? `Pakket (-${creditsForService} ${creditsForService === 1 ? 'sessie' : 'sessies'})`
-                                  : `Package (-${creditsForService} ${creditsForService === 1 ? 'session' : 'sessions'})`}
+                                {`Package (-${creditsForService} ${creditsForService === 1 ? 'session' : 'sessions'})`}
                               </span>
                               <span className="text-[11px] text-slate-500">
-                                ({totalSessionsLeft} {language === 'nl' ? 'over' : 'remaining'})
+                                ({totalSessionsLeft} {'remaining'})
                               </span>
                             </div>
                           ) : (
@@ -766,7 +846,8 @@ export const ClientPortal: React.FC = () => {
                 </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           {/* STEP 2: Select Date & Slot */}
           {step === 2 && (
@@ -1064,13 +1145,7 @@ export const ClientPortal: React.FC = () => {
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
-                                {language === 'nl'
-                                  ? `Schrijf ${creditsToDeductForSelectedService} ${
-                                      creditsToDeductForSelectedService === 1 ? 'sessie' : 'sessies'
-                                    } af van je pakket (${selectedService.durationMinutes} min sessie / ${getPackageStandardDuration(
-                                      selectedClientPackage
-                                    )} min standaard pakketsessie).`
-                                  : `Deduct ${creditsToDeductForSelectedService} ${
+                                {`Deduct ${creditsToDeductForSelectedService} ${
                                       creditsToDeductForSelectedService === 1
                                         ? 'session credit'
                                         : 'session credits'
@@ -1219,6 +1294,296 @@ export const ClientPortal: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: GROUP SESSIONS & WORKSHOPS (CAPACITY-LIMITED MULTI-CLIENT BOOKINGS)  */}
+      {/* ========================================================================= */}
+      {activeTab === 'groups' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Success Banner */}
+          {groupSessionSuccessMsg && (
+            <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/90 text-white p-4 shadow-lg flex items-center justify-between gap-3 animate-fade-in">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div className="text-xs">
+                  <span className="font-bold text-white block">
+                    {'Spot reserved!'}
+                  </span>
+                  <span className="text-emerald-300">{groupSessionSuccessMsg}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setGroupSessionSuccessMsg(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Header Card */}
+          <div className="rounded-3xl border border-purple-200/70 bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-900 p-6 sm:p-7 text-white shadow-xl shadow-purple-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/20 border border-purple-400/30 px-3 py-0.5 text-[11px] font-bold text-purple-300 mb-2">
+                <Users className="h-3.5 w-3.5" />
+                <span>{'Small Group & Workshops'}</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                {'Group Sessions & Workshops'}
+              </h3>
+              <p className="text-xs sm:text-sm text-purple-200/80 mt-1 max-w-xl leading-relaxed">
+                {'Train together with high-energy peer groups under direct coach guidance. Each group session has a strict maximum capacity.'}
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 text-xs font-bold self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => setGroupSessionFilter('all')}
+                className={`rounded-xl px-3 py-1.5 transition ${
+                  groupSessionFilter === 'all'
+                    ? 'bg-white text-slate-950 shadow-xs'
+                    : 'text-purple-200 hover:text-white'
+                }`}
+              >
+                {'All sessions'} ({upcomingGroupSessions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupSessionFilter('open')}
+                className={`rounded-xl px-3 py-1.5 transition ${
+                  groupSessionFilter === 'open'
+                    ? 'bg-white text-slate-950 shadow-xs'
+                    : 'text-purple-200 hover:text-white'
+                }`}
+              >
+                {'Spots open'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupSessionFilter('registered')}
+                className={`rounded-xl px-3 py-1.5 transition ${
+                  groupSessionFilter === 'registered'
+                    ? 'bg-white text-slate-950 shadow-xs'
+                    : 'text-purple-200 hover:text-white'
+                }`}
+              >
+                {'My bookings'} ({myRegisteredGroupSessionsCount})
+              </button>
+            </div>
+          </div>
+
+          {/* Group Sessions Grid */}
+          {(() => {
+            const filteredSessions = upcomingGroupSessions.filter((gs) => {
+              const activeCount = (gs.participants || []).filter((p) => p.status === 'confirmed').length;
+              const isRegistered = (gs.participants || []).some(
+                (p) => p.clientId === currentClient.id && p.status === 'confirmed'
+              );
+              const spotsLeft = Math.max(0, gs.maxParticipants - activeCount);
+
+              if (groupSessionFilter === 'open') return spotsLeft > 0;
+              if (groupSessionFilter === 'registered') return isRegistered;
+              return true;
+            });
+
+            if (filteredSessions.length === 0) {
+              return (
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-400 space-y-2">
+                  <Users className="h-10 w-10 mx-auto text-slate-300" />
+                  <p className="text-sm font-bold text-slate-700">
+                    {'No group sessions found matching this filter.'}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {'Try another filter or check back soon for newly scheduled sessions.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredSessions.map((gs) => {
+                  const activeParticipants = (gs.participants || []).filter(
+                    (p) => p.status === 'confirmed'
+                  );
+                  const isRegistered = activeParticipants.some(
+                    (p) => p.clientId === currentClient.id
+                  );
+                  const spotsLeft = Math.max(0, gs.maxParticipants - activeParticipants.length);
+                  const isFull = spotsLeft === 0;
+                  const occupancyPct = Math.min(
+                    100,
+                    Math.round((activeParticipants.length / gs.maxParticipants) * 100)
+                  );
+
+                  return (
+                    <div
+                      key={gs.id}
+                      className={`rounded-3xl border transition p-5 sm:p-6 flex flex-col justify-between gap-4 shadow-sm hover:shadow-md ${
+                        isRegistered
+                          ? 'border-purple-300 bg-purple-50/40'
+                          : isFull
+                          ? 'border-slate-200 bg-slate-50/60 opacity-90'
+                          : 'border-slate-200/90 bg-white hover:border-purple-300'
+                      }`}
+                    >
+                      {/* Top Row: Date badge, spots pill */}
+                      <div>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="rounded-full bg-purple-100 text-purple-900 border border-purple-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Users className="h-3 w-3 text-purple-700" />
+                              {'Group Session'}
+                            </span>
+                            {isRegistered && (
+                              <span className="rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                <Check className="h-3 w-3 text-emerald-700" />
+                                {'Registered'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Capacity status pill */}
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                              isFull
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : spotsLeft <= 2
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                            }`}
+                          >
+                            {isFull
+                              ? 'Fully Booked'
+                              : spotsLeft === 1
+                              ? 'Last spot!'
+                              : `${spotsLeft} spots left`}
+                          </span>
+                        </div>
+
+                        {/* Title & Description */}
+                        <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                          {gs.title}
+                        </h4>
+                        {gs.description && (
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2">
+                            {gs.description}
+                          </p>
+                        )}
+
+                        {/* Timing and Location Details */}
+                        <div className="mt-3.5 space-y-1.5 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                            <span className="font-semibold text-slate-800">
+                              {formatFullHumanDate(gs.date)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                              <span>
+                                {gs.startTime} - {gs.endTime} ({gs.durationMinutes} min)
+                              </span>
+                            </div>
+                            <span className="font-bold text-slate-900">
+                              {formatPrice(gs.price)} p.p.
+                            </span>
+                          </div>
+                          {gs.location && (
+                            <div className="flex items-center gap-2 text-slate-500 text-[11px] pt-1 border-t border-slate-200/50">
+                              <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                              <span>{gs.location}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Visual Capacity & Occupancy Bar */}
+                        <div className="mt-3.5 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3 text-slate-400" />
+                              <span>
+                                {activeParticipants.length} van {gs.maxParticipants} plekken bezet
+                              </span>
+                            </span>
+                            <span className="text-slate-700 font-bold">{occupancyPct}%</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                            <div
+                              style={{ width: `${occupancyPct}%` }}
+                              className={`h-full rounded-full transition-all ${
+                                isFull
+                                  ? 'bg-rose-500'
+                                  : spotsLeft <= 2
+                                  ? 'bg-amber-500'
+                                  : 'bg-purple-600'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                        {isRegistered ? (
+                          <>
+                            <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                              <span>{'You are registered'}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const confirmMsg =
+                                  `Are you sure you want to cancel your spot for "${gs.title}"?`;
+                                if (window.confirm(confirmMsg)) {
+                                  const res = cancelGroupSessionSpot(gs.id, currentClient.id);
+                                  if (res.success) {
+                                    setGroupSessionSuccessMsg(
+                                      'Your spot has been cancelled.'
+                                    );
+                                    setTimeout(() => setGroupSessionSuccessMsg(null), 4000);
+                                  }
+                                }
+                              }}
+                              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                            >
+                              {'Cancel spot'}
+                            </button>
+                          </>
+                        ) : isFull ? (
+                          <div className="w-full text-center py-2 px-3 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs border border-slate-200">
+                            {'Fully booked (Maximum reached)'}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-[11px] text-slate-500">
+                              {'Instant booking'}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGroupSessionToBook(gs)}
+                              className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2 shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Users className="h-3.5 w-3.5" />
+                              <span>{'Book Spot'}</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 2: MY APPOINTMENTS (UPCOMING & PAST WITH CANCEL & NOTES)              */}
       {/* ========================================================================= */}
       {activeTab === 'appointments' && (
@@ -1266,8 +1631,16 @@ export const ClientPortal: React.FC = () => {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-sm font-bold text-slate-900">
-                              {service?.name}
+                              {appt.isGroupSession
+                                ? appt.groupSessionTitle || service?.name
+                                : service?.name}
                             </h4>
+                            {appt.isGroupSession && (
+                              <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-800 border border-purple-200 flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {'Group Session'}
+                              </span>
+                            )}
                             <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800 border border-blue-200">
                               CONFIRMED
                             </span>
@@ -1473,7 +1846,7 @@ export const ClientPortal: React.FC = () => {
 
                         <div className="mt-3 text-xs text-slate-500 space-y-1">
                           <div>
-                            {language === 'nl' ? 'Standaard sessieduur:' : 'Standard session duration:'}{' '}
+                            {'Standard session duration:'}{' '}
                             <strong className="text-slate-700">{stdDuration} min</strong>{' '}
                             <span className="text-[11px] text-slate-400">
                               ({Math.round(stdDuration / 2)}m = 0.5 • {Math.round(stdDuration * 1.5)}m = 1.5)
@@ -1573,10 +1946,10 @@ export const ClientPortal: React.FC = () => {
                           </div>
 
                           <div className="mt-1 text-[11px] text-slate-500">
-                            {language === 'nl' ? 'Geldigheid:' : 'Validity:'}{' '}
+                            {'Validity:'}{' '}
                             <strong className={pkg.validityDays && pkg.validityDays > 0 ? 'text-slate-700' : 'text-emerald-700'}>
                               {pkg.validityDays && pkg.validityDays > 0
-                                ? `${pkg.validityDays} ${language === 'nl' ? 'dagen' : 'days'}`
+                                ? `${pkg.validityDays} ${'days'}`
                                 : t.noExpiration}
                             </strong>
                           </div>
@@ -1850,6 +2223,21 @@ export const ClientPortal: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Book Group Session Spot Modal */}
+      {selectedGroupSessionToBook && (
+        <BookGroupSessionModal
+          session={selectedGroupSessionToBook}
+          isOpen={Boolean(selectedGroupSessionToBook)}
+          onClose={() => setSelectedGroupSessionToBook(null)}
+          onSuccess={(session) => {
+            setGroupSessionSuccessMsg(
+              `Congratulations! Your spot for "${session.title}" has been confirmed.`
+            );
+            setTimeout(() => setGroupSessionSuccessMsg(null), 5000);
+          }}
+        />
       )}
     </div>
   );
