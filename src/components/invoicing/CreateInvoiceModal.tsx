@@ -252,17 +252,10 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         setItems(lineItems);
       } else {
         // Default single blank line
-        const chosenClient = clients.find((c) => c.id === chosenClientId);
-        const hasCustomRate =
-          chosenClient?.customHourlyRate !== undefined && chosenClient.customHourlyRate > 0;
-        const isIncl = hasCustomRate
-          ? chosenClient?.customHourlyRateIncludesVat ?? (settings.ratesIncludeVat ?? true)
-          : settings.ratesIncludeVat ?? true;
+        const isIncl = settings.ratesIncludeVat ?? true;
         setRatesIncludeVatMode(isIncl);
 
-        const defaultBase = hasCustomRate
-          ? chosenClient!.customHourlyRate!
-          : settings.standardHourlyRate || 65.0;
+        const defaultBase = settings.standardHourlyRate || 65.0;
         const calc = computeLineFromBase(defaultBase, 1, defaultVat, isIncl);
 
         setItems([

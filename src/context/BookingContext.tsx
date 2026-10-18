@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where, writeBatch, DocumentReference } from 'firebase/firestore';
 import {
   deleteUser,
   EmailAuthProvider,
@@ -36,6 +36,7 @@ import {
   InvoiceLineItem,
   GroupSession,
   GroupSessionParticipant,
+  GroupSessionTemplate,
   ProBookingBackupData,
 } from '../types';
 import {
@@ -48,6 +49,30 @@ import {
   initialInvoiceSettings,
   initialInvoices,
   initialGroupSessions,
+  initialGroupSessionTemplates,
+  isDemoClientId,
+  isDemoAppointmentId,
+  isDemoPackageId,
+  isDemoClientPackageId,
+  isDemoMessageId,
+  isDemoInvoiceId,
+  isDemoGroupSessionId,
+  isDemoServiceId,
+  isDemoAdHocId,
+  isDemoExceptionId,
+  isDemoDataCleared,
+  markDemoDataCleared,
+  clearDemoDataClearedFlag,
+  DEMO_CLIENT_IDS,
+  DEMO_APPOINTMENT_IDS,
+  DEMO_PACKAGE_IDS,
+  DEMO_CLIENT_PACKAGE_IDS,
+  DEMO_MESSAGE_IDS,
+  DEMO_INVOICE_IDS,
+  DEMO_GROUP_SESSION_IDS,
+  DEMO_SERVICE_IDS,
+  DEMO_ADHOC_IDS,
+  DEMO_EXCEPTION_IDS,
 } from '../data/initialData';
 import {
   parseDateISO,
@@ -121,6 +146,8 @@ interface BookingContextType {
   getClientActivePackages: (clientId: string, serviceId?: string, durationMinutes?: number) => ClientPackage[];
   getPackageStandardDuration: (cp?: ClientPackage, pkg?: ServicePackage) => number;
   calculatePackageCreditsForDuration: (durationMinutes: number, cp?: ClientPackage, pkg?: ServicePackage) => number;
+  getPackageRemainingValue: (cp?: ClientPackage) => number;
+  getPackageTotalValue: (cp?: ClientPackage, pkg?: ServicePackage) => number;
   adjustClientPackageBalance: (clientPackageId: string, change: number, reason?: string) => void;
   grantClientPackage: (clientId: string, packageId: string, customSessions?: number) => ClientPackage;
   updateClientPackage: (clientPackageId: string, updates: Partial<ClientPackage>) => void;
@@ -214,8 +241,22 @@ interface BookingContextType {
   cancelAppointment: (
     appointmentId: string,
     reason?: string,
-    forcedByProvider?: boolean
+    forcedByProvider?: boolean,
+    clientAcceptsLateFee?: boolean
   ) => { success: boolean; message: string };
+  rescheduleAppointment: (
+    appointmentId: string,
+    newDate: string,
+    newSlot: TimeSlot,
+    forceLateWithFee?: boolean
+  ) => {
+    success: boolean;
+    message: string;
+    appointment?: Appointment;
+    noShowAppointment?: Appointment;
+    isLate?: boolean;
+    fee?: number;
+  };
   updateAppointmentStatus: (
     appointmentId: string,
     status: AppointmentStatus,
@@ -248,6 +289,20 @@ interface BookingContextType {
   ) => { success: boolean; message: string };
   isClientInGroupSession: (groupSessionId: string, clientId: string) => boolean;
   getGroupSessionSpotsLeft: (groupSessionId: string) => number;
+  // Group Session Quick Templates
+  groupSessionTemplates: GroupSessionTemplate[];
+  addGroupSessionTemplate: (
+    template: Omit<GroupSessionTemplate, 'id' | 'createdAt'>
+  ) => GroupSessionTemplate;
+  updateGroupSessionTemplate: (id: string, updates: Partial<GroupSessionTemplate>) => void;
+  deleteGroupSessionTemplate: (id: string) => void;
+  addGroupSessionsBatch: (
+    sessions: Array<
+      Omit<GroupSession, 'id' | 'createdAt' | 'participants'> & {
+        participants?: GroupSessionParticipant[];
+      }
+    >
+  ) => GroupSession[];
   
   // Invoicing & Billing
   updateBillingItemStatus: (
@@ -265,8 +320,11 @@ interface BookingContextType {
   unbilledItemsCount: number;
   totalUnbilledAmount: number;
   
-  // Slot calculations
-  getAvailableSlotsForDate: (dateStr: string, serviceDurationMinutes: number) => TimeSlot[];
+  getAvailableSlotsForDate: (
+    dateStr: string,
+    serviceDurationMinutes: number,
+    excludeAppointmentId?: string
+  ) => TimeSlot[];
   calculateSessionPrice: (clientId: string, serviceId: string, durationMinutes?: number) => number;
   
   // Chat & Messaging
@@ -493,61 +551,177 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           : parsed.name || fallbackUserName;
         const isDemoEmail =
           parsed.email === 'mark@jansen-performance.nl' || parsed.email === 'alex@probooking.nl';
+        const isCleared = isDemoDataCleared(effectiveUid);
+        const resolvedAdHoc = isCleared
+          ? (Array.isArray(parsed.adHocSchedule) ? parsed.adHocSchedule : []).filter((s: any) => !isDemoAdHocId(s.id))
+          : (Array.isArray(parsed.adHocSchedule) ? parsed.adHocSchedule : initialSettings.adHocSchedule);
+        const resolvedServices = isCleared
+          ? (Array.isArray(parsed.services) ? parsed.services : []).filter((s: any) => !isDemoServiceId(s.id))
+          : (Array.isArray(parsed.services) ? parsed.services : initialSettings.services);
+        const resolvedExceptions = isCleared
+          ? (Array.isArray(parsed.exceptions) ? parsed.exceptions : []).filter((e: any) => !isDemoExceptionId(e.id))
+          : (Array.isArray(parsed.exceptions) ? parsed.exceptions : initialSettings.exceptions);
+
         return {
           ...initialSettings,
           ...parsed,
           name: resolvedName,
           email: (!isDemoEmail && parsed.email) || fallbackUserEmail,
           availabilityMode: 'adhoc',
-          adHocSchedule: Array.isArray(parsed.adHocSchedule)
-            ? parsed.adHocSchedule
-            : initialSettings.adHocSchedule,
+          adHocSchedule: resolvedAdHoc,
+          services: resolvedServices,
+          exceptions: resolvedExceptions,
         };
       } catch {
+        const isCleared = isDemoDataCleared(effectiveUid);
         return {
           ...initialSettings,
           name: fallbackUserName,
           profession: 'Personal Trainer & Coach',
           email: fallbackUserEmail,
+          adHocSchedule: isCleared ? [] : initialSettings.adHocSchedule,
+          services: isCleared ? [] : initialSettings.services,
+          exceptions: isCleared ? [] : initialSettings.exceptions,
         };
       }
     }
+    const isCleared = isDemoDataCleared(effectiveUid);
     return {
       ...initialSettings,
       name: fallbackUserName,
       profession: 'Personal Trainer & Coach',
       email: fallbackUserEmail,
+      adHocSchedule: isCleared ? [] : initialSettings.adHocSchedule,
+      services: isCleared ? [] : initialSettings.services,
+      exceptions: isCleared ? [] : initialSettings.exceptions,
     };
   });
 
   const [clients, setClients] = useState<Client[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_clients`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((c: Client) => !isDemoClientId(c.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialClients;
   });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_appointments`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((a: Appointment) => !isDemoAppointmentId(a.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialAppointments;
   });
 
   const [packages, setPackages] = useState<ServicePackage[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_packages`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((p: ServicePackage) => !isDemoPackageId(p.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialPackages;
   });
 
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_clientPackages`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((cp: ClientPackage) => !isDemoClientPackageId(cp.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialClientPackages;
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_messages`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((m: ChatMessage) => !isDemoMessageId(m.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialMessages;
   });
 
   const [groupSessions, setGroupSessions] = useState<GroupSession[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_groupSessions`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((gs: GroupSession) => !isDemoGroupSessionId(gs.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialGroupSessions;
+  });
+
+  const [groupSessionTemplates, setGroupSessionTemplates] = useState<GroupSessionTemplate[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
+    const saved = localStorage.getItem(`${userStoragePrefix}_groupSessionTemplates`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // fallback
+      }
+    }
+    return initialGroupSessionTemplates;
   });
 
   const [selectedChatClientId, setSelectedChatClientId] = useState<string>('cli-1');
@@ -600,7 +774,19 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    const isCleared = isDemoDataCleared(effectiveUid);
     const saved = localStorage.getItem(`${userStoragePrefix}_invoices`);
+    if (isCleared) {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed.filter((inv: Invoice) => !isDemoInvoiceId(inv.id)) : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return saved ? JSON.parse(saved) : initialInvoices;
   });
 
@@ -766,6 +952,45 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             data.email ||
             settings.email;
 
+          const isCleared =
+            data.demoDataCleared === true ||
+            isDemoDataCleared(targetUid);
+
+          if (isCleared) {
+            markDemoDataCleared(targetUid);
+            if (data.demoDataCleared !== true) {
+              setDoc(doc(db, 'users', targetUid), { demoDataCleared: true }, { merge: true }).catch(() => {});
+              setDoc(doc(db, 'trainers', targetUid), { demoDataCleared: true }, { merge: true }).catch(() => {});
+            }
+          }
+
+          const rawAdHoc = Array.isArray(cloudSettings.adHocSchedule)
+            ? cloudSettings.adHocSchedule
+            : isCleared
+            ? []
+            : settings.adHocSchedule;
+          const loadedAdHocSchedule = isCleared
+            ? rawAdHoc.filter((s: any) => !isDemoAdHocId(s.id))
+            : rawAdHoc;
+
+          const rawExceptions = Array.isArray(cloudSettings.exceptions)
+            ? cloudSettings.exceptions
+            : isCleared
+            ? []
+            : settings.exceptions;
+          const loadedExceptions = isCleared
+            ? rawExceptions.filter((e: any) => !isDemoExceptionId(e.id))
+            : rawExceptions;
+
+          const rawServices = Array.isArray(cloudSettings.services)
+            ? cloudSettings.services
+            : isCleared
+            ? []
+            : settings.services;
+          const loadedServices = isCleared
+            ? rawServices.filter((s: any) => !isDemoServiceId(s.id))
+            : rawServices;
+
           const loadedSettings: ProviderSettings = {
             ...settings,
             ...cloudSettings,
@@ -775,25 +1000,23 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             standardHourlyRate: resolvedRate,
             email: resolvedEmail,
             availabilityMode: 'adhoc',
-            adHocSchedule: Array.isArray(cloudSettings.adHocSchedule)
-              ? cloudSettings.adHocSchedule
-              : settings.adHocSchedule,
-            exceptions: Array.isArray(cloudSettings.exceptions)
-              ? cloudSettings.exceptions
-              : settings.exceptions,
-            services: Array.isArray(cloudSettings.services)
-              ? cloudSettings.services
-              : settings.services,
+            adHocSchedule: loadedAdHocSchedule,
+            exceptions: loadedExceptions,
+            services: loadedServices,
           };
 
-          const cloudClients: Client[] = Array.isArray(data.clients) ? data.clients : [];
+          const cloudClients: Client[] = Array.isArray(data.clients)
+            ? (isCleared ? data.clients.filter((c: Client) => !isDemoClientId(c.id)) : data.clients)
+            : [];
           let subcollectionClients: Client[] = [];
           try {
             const subSnap = await getDocs(collection(db, 'users', targetUid, 'clients'));
             subSnap.forEach((d) => {
               const cData = d.data() as Client;
               if (cData && cData.id) {
-                subcollectionClients.push(cData);
+                if (!isCleared || !isDemoClientId(cData.id)) {
+                  subcollectionClients.push(cData);
+                }
               }
             });
           } catch {
@@ -808,32 +1031,69 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           for (const c of subcollectionClients) {
             if (c && c.id) mergedClientsMap.set(c.id, c);
           }
-          const demoClientIds = new Set(initialClients.map((ic) => ic.id));
           for (const localC of clients) {
             if (localC && localC.id && !mergedClientsMap.has(localC.id)) {
-              if (!demoClientIds.has(localC.id) || !Array.isArray(data.clients)) {
+              if (!isDemoClientId(localC.id)) {
                 mergedClientsMap.set(localC.id, localC);
               }
             }
           }
 
-          const loadedClients: Client[] =
-            mergedClientsMap.size > 0
-              ? Array.from(mergedClientsMap.values())
-              : Array.isArray(data.clients)
-              ? data.clients
-              : clients;
-          const loadedAppointments: Appointment[] = Array.isArray(data.appointments) ? data.appointments : appointments;
-          const loadedPackages: ServicePackage[] = Array.isArray(data.packages) ? data.packages : packages;
-          const loadedClientPackages: ClientPackage[] = Array.isArray(data.clientPackages) ? data.clientPackages : clientPackages;
-          const loadedMessages: ChatMessage[] = Array.isArray(data.messages) ? data.messages : messages;
-          const loadedInvoices: Invoice[] = Array.isArray(data.invoices) ? data.invoices : invoices;
+          const filteredMergedClients = Array.from(mergedClientsMap.values()).filter(
+            (c) => !isCleared || !isDemoClientId(c.id)
+          );
+
+          const loadedClients: Client[] = isCleared
+            ? filteredMergedClients
+            : filteredMergedClients.length > 0
+            ? filteredMergedClients
+            : Array.isArray(data.clients)
+            ? data.clients
+            : clients;
+          const loadedAppointments: Appointment[] = isCleared
+            ? (Array.isArray(data.appointments)
+                ? data.appointments.filter((a: Appointment) => !isDemoAppointmentId(a.id))
+                : appointments.filter((a: Appointment) => !isDemoAppointmentId(a.id)))
+            : (Array.isArray(data.appointments) ? data.appointments : appointments);
+          const loadedPackages: ServicePackage[] = isCleared
+            ? (Array.isArray(data.packages)
+                ? data.packages.filter((p: ServicePackage) => !isDemoPackageId(p.id))
+                : packages.filter((p: ServicePackage) => !isDemoPackageId(p.id)))
+            : (Array.isArray(data.packages) ? data.packages : packages);
+          const loadedClientPackages: ClientPackage[] = isCleared
+            ? (Array.isArray(data.clientPackages)
+                ? data.clientPackages.filter((cp: ClientPackage) => !isDemoClientPackageId(cp.id))
+                : clientPackages.filter((cp: ClientPackage) => !isDemoClientPackageId(cp.id)))
+            : (Array.isArray(data.clientPackages) ? data.clientPackages : clientPackages);
+          const loadedMessages: ChatMessage[] = isCleared
+            ? (Array.isArray(data.messages)
+                ? data.messages.filter((m: ChatMessage) => !isDemoMessageId(m.id))
+                : messages.filter((m: ChatMessage) => !isDemoMessageId(m.id)))
+            : (Array.isArray(data.messages) ? data.messages : messages);
+          const loadedInvoices: Invoice[] = isCleared
+            ? (Array.isArray(data.invoices)
+                ? data.invoices.filter((inv: Invoice) => !isDemoInvoiceId(inv.id))
+                : invoices.filter((inv: Invoice) => !isDemoInvoiceId(inv.id)))
+            : (Array.isArray(data.invoices) ? data.invoices : invoices);
+          const loadedGroupSessions: GroupSession[] = isCleared
+            ? (Array.isArray(data.groupSessions)
+                ? data.groupSessions.filter((gs: GroupSession) => !isDemoGroupSessionId(gs.id))
+                : groupSessions.filter((gs: GroupSession) => !isDemoGroupSessionId(gs.id)))
+            : (Array.isArray(data.groupSessions) ? data.groupSessions : groupSessions);
 
           // Reset diff maps so existing items get verified/synced to subcollections if needed
           prevSubcollectionsRef.current = {};
 
           setSettings(loadedSettings);
           setClients(loadedClients);
+          setAppointments(loadedAppointments);
+          setPackages(loadedPackages);
+          setClientPackages(loadedClientPackages);
+          setMessages(loadedMessages);
+          setGroupSessions(loadedGroupSessions);
+          if (Array.isArray(data.groupSessionTemplates)) {
+            setGroupSessionTemplates(data.groupSessionTemplates);
+          }
 
           if (urlToken) {
             isMagicLinkModeRef.current = true;
@@ -944,6 +1204,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           setSettings(initialTrainerSettings);
           setInvoiceSettings(initialTrainerInvoiceSettings);
 
+          const isCleared = isDemoDataCleared(authUid);
           const initialTrainerPayload = JSON.parse(
             JSON.stringify({
               uid: authUid,
@@ -953,13 +1214,15 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               phone: initialTrainerSettings.phone,
               standardHourlyRate: initialTrainerSettings.standardHourlyRate,
               settings: initialTrainerSettings,
-              clients,
-              appointments,
-              packages,
-              clientPackages,
-              messages,
+              clients: isCleared ? [] : clients,
+              appointments: isCleared ? [] : appointments,
+              packages: isCleared ? [] : packages,
+              clientPackages: isCleared ? [] : clientPackages,
+              messages: isCleared ? [] : messages,
+              groupSessions: isCleared ? [] : groupSessions,
               invoiceSettings: initialTrainerInvoiceSettings,
-              invoices,
+              invoices: isCleared ? [] : invoices,
+              demoDataCleared: isCleared,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             })
@@ -1034,6 +1297,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   useEffect(() => {
     if (isAccountDeletingRef.current) return;
+    localStorage.setItem(`${userStoragePrefix}_groupSessionTemplates`, JSON.stringify(groupSessionTemplates));
+  }, [groupSessionTemplates, userStoragePrefix]);
+
+  useEffect(() => {
+    if (isAccountDeletingRef.current) return;
     localStorage.setItem(`${userStoragePrefix}_invoiceSettings`, JSON.stringify(invoiceSettings));
   }, [invoiceSettings, userStoragePrefix]);
 
@@ -1051,6 +1319,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (isAccountDeletingRef.current) return;
       try {
         const nowIso = new Date().toISOString();
+        const isCleared = isDemoDataCleared(uid);
         const trainerDocPayload = JSON.parse(
           JSON.stringify({
             uid,
@@ -1060,13 +1329,16 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             phone: settings.phone,
             standardHourlyRate: settings.standardHourlyRate,
             settings,
-            clients,
-            appointments,
-            packages,
-            clientPackages,
-            messages,
+            clients: isCleared ? clients.filter((c) => !isDemoClientId(c.id)) : clients,
+            appointments: isCleared ? appointments.filter((a) => !isDemoAppointmentId(a.id)) : appointments,
+            packages: isCleared ? packages.filter((p) => !isDemoPackageId(p.id)) : packages,
+            clientPackages: isCleared ? clientPackages.filter((cp) => !isDemoClientPackageId(cp.id)) : clientPackages,
+            messages: isCleared ? messages.filter((m) => !isDemoMessageId(m.id)) : messages,
+            groupSessions: isCleared ? groupSessions.filter((gs) => !isDemoGroupSessionId(gs.id)) : groupSessions,
+            groupSessionTemplates,
             invoiceSettings,
-            invoices,
+            invoices: isCleared ? invoices.filter((inv) => !isDemoInvoiceId(inv.id)) : invoices,
+            demoDataCleared: isCleared,
             updatedAt: nowIso,
           })
         );
@@ -1177,6 +1449,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     messages,
     invoiceSettings,
     invoices,
+    groupSessions,
+    groupSessionTemplates,
   ]);
 
 
@@ -1239,11 +1513,33 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const formatPrice = (amount: number | undefined | null) => formatCurrency(amount, currency);
 
-  const activeClients = useMemo(() => clients.filter((c) => !c.isArchived), [clients]);
+  const activeClients = useMemo(() => {
+    return clients
+      .filter((c) => !c.isArchived)
+      .sort((a, b) => {
+        const getParts = (c: Client) => {
+          if (c.firstName || c.lastName) {
+            return { first: (c.firstName || '').trim(), last: (c.lastName || '').trim() };
+          }
+          const p = (c.name || '').trim().split(/\s+/);
+          return { first: p[0] || '', last: p.slice(1).join(' ') };
+        };
+        const aN = getParts(a);
+        const bN = getParts(b);
+        const lastComp = aN.last.localeCompare(bN.last, undefined, { sensitivity: 'base', numeric: true });
+        if (lastComp !== 0) return lastComp;
+        return aN.first.localeCompare(bN.first, undefined, { sensitivity: 'base', numeric: true });
+      });
+  }, [clients]);
   const currentClient = useMemo(() => clients.find((c) => c.id === activeClientId), [clients, activeClientId]);
 
   // Settings update
   const updateSettings = (newSettings: Partial<ProviderSettings>) => {
+    if (newSettings.hasSavedSettings) {
+      try {
+        localStorage.setItem('probooking_settings_configured', 'true');
+      } catch {}
+    }
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
       // Also keep invoiceSettings in sync when trainer updates their name, email, or phone
@@ -1316,12 +1612,23 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const addClient = (clientData: Omit<Client, 'id' | 'magicToken' | 'createdAt'>): Client => {
+    const firstName = (clientData.firstName || '').trim();
+    const lastName = (clientData.lastName || '').trim();
+    const combinedName =
+      clientData.name && clientData.name.trim()
+        ? clientData.name.trim()
+        : [firstName, lastName].filter(Boolean).join(' ').trim();
+    const resolvedName = combinedName || 'Client';
+
     const randomHex = Math.random().toString(36).substring(2, 7);
-    const slug = (clientData.name || 'client').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const token = `tok-${slug}-${randomHex}`;
+    const slug = resolvedName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const token = `tok-${slug || 'client'}-${randomHex}`;
     
     const newClient: Client = {
       ...clientData,
+      name: resolvedName,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       id: `cli-${Date.now()}`,
       magicToken: token,
       createdAt: formatDateISO(new Date()),
@@ -1339,7 +1646,23 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       let updatedClient: Client | null = null;
       const nextClients = prev.map((c) => {
         if (c.id === id) {
-          updatedClient = { ...c, ...clientData };
+          const nextFirstName =
+            clientData.firstName !== undefined ? clientData.firstName.trim() : c.firstName;
+          const nextLastName =
+            clientData.lastName !== undefined ? clientData.lastName.trim() : c.lastName;
+          const combinedName =
+            clientData.name !== undefined && clientData.name.trim()
+              ? clientData.name.trim()
+              : [nextFirstName, nextLastName].filter(Boolean).join(' ').trim();
+          const nextName = combinedName || c.name;
+
+          updatedClient = {
+            ...c,
+            ...clientData,
+            firstName: nextFirstName || undefined,
+            lastName: nextLastName || undefined,
+            name: nextName,
+          };
           return updatedClient;
         }
         return c;
@@ -1520,6 +1843,38 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     [getPackageStandardDuration]
   );
 
+  // Calculates / returns the current remaining monetary value in EUR of a ClientPackage
+  const getPackageRemainingValue = useCallback(
+    (cp?: ClientPackage): number => {
+      if (!cp) return 0;
+      if (typeof cp.remainingValue === 'number') return cp.remainingValue;
+      // Fallback: derive from remainingSessions * standard session hourly rate
+      const stdDuration = cp.sessionDurationMinutes || settings.standardSlotDuration || 60;
+      const rate = settings.standardHourlyRate || 65;
+      const sessionWorth = (stdDuration / 60) * rate;
+      return Math.max(0, Math.round(cp.remainingSessions * sessionWorth * 100) / 100);
+    },
+    [settings.standardHourlyRate, settings.standardSlotDuration]
+  );
+
+  // Calculates / returns the total standard value in EUR of a package (e.g. 4 * 0.5 * 100 = 200)
+  const getPackageTotalValue = useCallback(
+    (cp?: ClientPackage, pkg?: ServicePackage): number => {
+      if (!cp && !pkg) return 0;
+      if (cp && typeof cp.totalValue === 'number' && cp.totalValue > 0) return cp.totalValue;
+      if (pkg && typeof pkg.originalValue === 'number' && pkg.originalValue > 0) return pkg.originalValue;
+      const matchedPkg = pkg || (cp ? packages.find((p) => p.id === cp.packageId) : undefined);
+      if (matchedPkg && typeof matchedPkg.originalValue === 'number' && matchedPkg.originalValue > 0) {
+        return matchedPkg.originalValue;
+      }
+      const count = cp ? cp.totalSessions : (pkg ? pkg.sessionCount : 1);
+      const stdDuration = cp?.sessionDurationMinutes || pkg?.sessionDurationMinutes || settings.standardSlotDuration || 60;
+      const rate = settings.standardHourlyRate || 65;
+      return Math.max(0, Math.round(count * (stdDuration / 60) * rate * 100) / 100);
+    },
+    [packages, settings.standardHourlyRate, settings.standardSlotDuration]
+  );
+
   const addPackage = (pkgData: Omit<ServicePackage, 'id'>) => {
     const newPkg: ServicePackage = {
       ...pkgData,
@@ -1564,6 +1919,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     const todayStr = formatDateISO(new Date());
     const expiresAt = pkg.validityDays ? addDaysToISO(todayStr, pkg.validityDays) : undefined;
     const stdDuration = getPackageStandardDuration(undefined, pkg);
+    const hourlyRate = settings.standardHourlyRate || 65;
+    const standardVal =
+      typeof pkg.originalValue === 'number' && pkg.originalValue > 0
+        ? pkg.originalValue
+        : Math.round(pkg.sessionCount * (stdDuration / 60) * hourlyRate * 100) / 100;
 
     const newClientPackage: ClientPackage = {
       id: `cpkg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1571,6 +1931,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       packageId: pkg.id,
       packageName: pkg.name,
       serviceId: pkg.serviceId,
+      totalValue: standardVal,
+      remainingValue: standardVal,
       totalSessions: pkg.sessionCount,
       remainingSessions: pkg.sessionCount,
       sessionDurationMinutes: stdDuration,
@@ -1606,6 +1968,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     const count = customSessions || pkg.sessionCount;
     const expiresAt = pkg.validityDays ? addDaysToISO(todayStr, pkg.validityDays) : undefined;
     const stdDuration = getPackageStandardDuration(undefined, pkg as ServicePackage);
+    const hourlyRate = settings.standardHourlyRate || 65;
+    const standardVal =
+      !customSessions && typeof pkg.originalValue === 'number' && pkg.originalValue > 0
+        ? pkg.originalValue
+        : Math.round(count * (stdDuration / 60) * hourlyRate * 100) / 100;
 
     const newClientPackage: ClientPackage = {
       id: `cpkg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -1613,6 +1980,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       packageId: pkg.id,
       packageName: pkg.name,
       serviceId: pkg.serviceId,
+      totalValue: standardVal,
+      remainingValue: standardVal,
       totalSessions: count,
       remainingSessions: count,
       sessionDurationMinutes: stdDuration,
@@ -1641,28 +2010,36 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     return clientPackages.filter((cp) => {
       if (cp.clientId !== clientId) return false;
-      if (cp.remainingSessions <= 0) return false;
+      const remVal = getPackageRemainingValue(cp);
+      if (remVal <= 0 && cp.remainingSessions <= 0) return false;
       if (cp.expiresAt && cp.expiresAt < todayStr) return false;
-      if (effectiveDuration && effectiveDuration > 0) {
-        const neededCredits = calculatePackageCreditsForDuration(effectiveDuration, cp);
-        if (cp.remainingSessions + 0.0001 < neededCredits) return false;
+      if (serviceId) {
+        const sessionCost = calculateSessionPrice(clientId, serviceId, effectiveDuration);
+        if (remVal < sessionCost && cp.remainingSessions <= 0) return false;
       }
       return true;
     });
   };
 
-  const adjustClientPackageBalance = (clientPackageId: string, change: number) => {
+  const adjustClientPackageBalance = (clientPackageId: string, changeInEuro: number) => {
     setClientPackages((prev) =>
       prev.map((cp) => {
         if (cp.id === clientPackageId) {
-          const newRemaining = Math.max(
+          const curVal = getPackageRemainingValue(cp);
+          const newRemainingVal = Math.max(
             0,
-            Math.round((cp.remainingSessions + change) * 100) / 100
+            Math.round((curVal + changeInEuro) * 100) / 100
           );
+          const stdDuration = cp.sessionDurationMinutes || settings.standardSlotDuration || 60;
+          const rate = settings.standardHourlyRate || 65;
+          const sessionWorth = Math.max(1, (stdDuration / 60) * rate);
+          const approxSessions = Math.max(0, Math.round((newRemainingVal / sessionWorth) * 10) / 10);
+
           return {
             ...cp,
-            remainingSessions: newRemaining,
-            status: newRemaining > 0 ? 'active' : 'exhausted',
+            remainingValue: newRemainingVal,
+            remainingSessions: approxSessions,
+            status: newRemainingVal > 0 ? 'active' : 'exhausted',
           };
         }
         return cp;
@@ -2174,17 +2551,20 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   // Rates & Price calculation (FR-7.1, FR-7.2, FR-7.3)
+  // Invoicing and session prices must always be based on the rate of the service type
   const calculateSessionPrice = (
     clientId: string,
     serviceId: string,
     durationMinutes?: number
   ): number => {
     const service = settings.services.find((s) => s.id === serviceId);
+    if (service && typeof service.basePrice === 'number') {
+      return service.basePrice;
+    }
     const duration = durationMinutes || service?.durationMinutes || settings.standardSlotDuration;
-    const client = clients.find((c) => c.id === clientId);
 
-    // If client has specific hourly rate override, use that; else standard
-    const hourlyRate = client?.customHourlyRate ?? settings.standardHourlyRate;
+    // Use provider standard hourly rate
+    const hourlyRate = settings.standardHourlyRate;
     
     // Calculate proportional price based on duration: e.g. 60 min = 1.0 * hourlyRate, 30 min = 0.5 * hourlyRate
     const calculatedPrice = (hourlyRate * duration) / 60;
@@ -2195,7 +2575,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Supports both fixed 'weekly' recurring schedule and dynamic 'adhoc' date-by-date schedule
   // Ensures booked slots are removed, and cancelled slots immediately become available again.
   const getAvailableSlotsForDate = useCallback(
-    (dateStr: string, serviceDurationMinutes: number): TimeSlot[] => {
+    (
+      dateStr: string,
+      serviceDurationMinutes: number,
+      excludeAppointmentId?: string
+    ): TimeSlot[] => {
       // 1. Check if entire day is blocked by an exception (vacation, sickness, etc.)
       const isExceptionBlocked = (settings.exceptions || []).some((exc) => {
         return dateStr >= exc.startDate && dateStr <= exc.endDate;
@@ -2254,9 +2638,13 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
 
       // Find all existing active appointments on this day (reserved or delivered)
-      // Note: CANCELLED appointments are explicitly excluded so the slot is freed up immediately!
+      // Note: CANCELLED appointments and the appointment being rescheduled are excluded
       const existingAppointments = appointments.filter(
-        (a) => a.date === dateStr && a.status !== 'cancelled'
+        (a) =>
+          a.date === dateStr &&
+          a.status !== 'cancelled' &&
+          a.status !== 'no-show' &&
+          (!excludeAppointmentId || a.id !== excludeAppointmentId)
       );
 
       const availableSlots: TimeSlot[] = [];
@@ -2394,6 +2782,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     let usedPackage: ClientPackage | undefined = undefined;
     let creditsToDeduct = 0;
+    const sessionCost = calculateSessionPrice(clientId, serviceId, service.durationMinutes);
+
     if (clientPackageId) {
       usedPackage = clientPackages.find(
         (cp) => cp.id === clientPackageId && cp.clientId === clientId
@@ -2402,10 +2792,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         return { success: false, message: 'Selected package was not found.' };
       }
       creditsToDeduct = calculatePackageCreditsForDuration(service.durationMinutes, usedPackage);
-      if (usedPackage.remainingSessions <= 0 || usedPackage.remainingSessions + 0.0001 < creditsToDeduct) {
+      const remVal = getPackageRemainingValue(usedPackage);
+      if (remVal <= 0 || (remVal + 0.001 < sessionCost && usedPackage.remainingSessions <= 0)) {
         return {
           success: false,
-          message: `Selected package has insufficient remaining sessions (${usedPackage.remainingSessions} left, ${creditsToDeduct} needed).`,
+          message: `The selected package has insufficient balance (€${remVal.toFixed(2)} remaining, session rate: €${sessionCost.toFixed(2)}).`,
         };
       }
       if (usedPackage.expiresAt && usedPackage.expiresAt < date) {
@@ -2417,8 +2808,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     const endMin = startMin + service.durationMinutes;
     const endTime = minutesToTime(endMin);
 
-    const standardPrice = calculateSessionPrice(clientId, serviceId, service.durationMinutes);
-    const price = usedPackage ? 0 : standardPrice;
+    const price = usedPackage ? 0 : sessionCost;
 
     const newAppt: Appointment = {
       id: `apt-${Date.now()}`,
@@ -2433,24 +2823,29 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       createdAt: formatDateISO(new Date()),
       packageId: usedPackage?.id,
       packageName: usedPackage?.packageName,
+      packageValueDeducted: usedPackage ? sessionCost : undefined,
       packageSessionsDeducted: usedPackage ? creditsToDeduct : undefined,
     };
 
     setAppointments((prev) => [newAppt, ...prev]);
 
-    // If a package was used, decrement remainingSessions proportionally based on session duration
-    if (usedPackage && creditsToDeduct > 0) {
-      const remainingAfterDeduction = Math.max(
-        0,
-        Math.round((usedPackage.remainingSessions - creditsToDeduct) * 100) / 100
-      );
+    // If a package was used, decrement remainingValue in Euro based on session cost!
+    if (usedPackage) {
+      const curVal = getPackageRemainingValue(usedPackage);
+      const remainingValAfter = Math.max(0, Math.round((curVal - sessionCost) * 100) / 100);
+      const stdDuration = usedPackage.sessionDurationMinutes || settings.standardSlotDuration || 60;
+      const rate = settings.standardHourlyRate || 65;
+      const sessionWorth = Math.max(1, (stdDuration / 60) * rate);
+      const approxSessions = Math.max(0, Math.round((remainingValAfter / sessionWorth) * 10) / 10);
+
       setClientPackages((prev) =>
         prev.map((cp) =>
           cp.id === usedPackage!.id
             ? {
                 ...cp,
-                remainingSessions: remainingAfterDeduction,
-                status: remainingAfterDeduction === 0 ? 'exhausted' : cp.status,
+                remainingValue: remainingValAfter,
+                remainingSessions: approxSessions,
+                status: remainingValAfter === 0 ? 'exhausted' : cp.status,
               }
             : cp
         )
@@ -2463,41 +2858,54 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const cancelAppointment = (
     appointmentId: string,
     reason?: string,
-    forcedByProvider: boolean = false
+    forcedByProvider: boolean = false,
+    clientAcceptsLateFee: boolean = false
   ): { success: boolean; message: string } => {
     const appt = appointments.find((a) => a.id === appointmentId);
     if (!appt) return { success: false, message: 'Appointment not found' };
 
     // Check cancellation window policy if not forced by provider (FR-6.2, FR-6.3)
-    if (!forcedByProvider) {
-      const check = isCancellationAllowed(
-        appt.date,
-        appt.startTime,
-        settings.cancellationPolicyHours,
-        settings.allowUnrestrictedCancellation
-      );
+    const check = isCancellationAllowed(
+      appt.date,
+      appt.startTime,
+      settings.cancellationPolicyHours,
+      settings.allowUnrestrictedCancellation
+    );
 
-      if (!check.allowed) {
-        return {
-          success: false,
-          message: `Cancellation window expired. Cancellations must be made at least ${settings.cancellationPolicyHours} hours before the appointment. Please contact ${settings.name} directly.`,
-        };
-      }
+    const isLate = !check.allowed && !forcedByProvider;
+
+    if (isLate && !clientAcceptsLateFee) {
+      return {
+        success: false,
+        message: `Cancellation window expired. Cancellations must be made at least ${settings.cancellationPolicyHours} hours before the appointment. Please contact ${settings.name} directly.`,
+      };
     }
 
-    // If appointment was booked via a package, restore the exact number of deducted sessions!
-    if (appt.packageId) {
+    const service = settings.services.find((s) => s.id === appt.serviceId);
+    const serviceRate =
+      service && typeof service.basePrice === 'number'
+        ? service.basePrice
+        : typeof appt.price === 'number' && appt.price > 0
+        ? appt.price
+        : (settings.standardHourlyRate || 65) * (appt.durationMinutes / 60);
+
+    // If timely and appointment was booked via a package, restore the exact euro value and credits!
+    if (!isLate && appt.packageId) {
       setClientPackages((prev) =>
         prev.map((cp) => {
           if (cp.id === appt.packageId) {
+            const valToRestore = appt.packageValueDeducted ?? serviceRate;
+            const curVal = getPackageRemainingValue(cp);
+            const updatedValue = Math.round((curVal + valToRestore) * 100) / 100;
             const creditsToRestore =
               appt.packageSessionsDeducted ??
               calculatePackageCreditsForDuration(appt.durationMinutes, cp);
-            const updatedRemaining = Math.round((cp.remainingSessions + creditsToRestore) * 100) / 100;
+            const updatedRemainingSessions = Math.round((cp.remainingSessions + creditsToRestore) * 100) / 100;
             return {
               ...cp,
-              remainingSessions: updatedRemaining,
-              status: updatedRemaining > 0 ? 'active' : cp.status,
+              remainingValue: updatedValue,
+              remainingSessions: updatedRemainingSessions,
+              status: updatedValue > 0 ? 'active' : cp.status,
             };
           }
           return cp;
@@ -2505,7 +2913,31 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       );
     }
 
-    // Update appointment status to cancelled (FR-6.4)
+    if (isLate) {
+      // Marked as no-show with billingStatus: 'to_invoice' so trainer can bill the fee
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === appointmentId
+            ? {
+                ...a,
+                status: 'no-show',
+                cancelledAt: new Date().toISOString(),
+                cancellationReason:
+                  reason || `Late cancellation by client (< ${settings.cancellationPolicyHours}h prior to start)`,
+                billingStatus: 'to_invoice',
+                price: serviceRate,
+              }
+            : a
+        )
+      );
+
+      return {
+        success: true,
+        message: 'Appointment cancelled. In accordance with the cancellation policy, the fee will be billed as a no-show.',
+      };
+    }
+
+    // Normal timely cancellation
     setAppointments((prev) =>
       prev.map((a) =>
         a.id === appointmentId
@@ -2522,6 +2954,228 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     return { success: true, message: 'Appointment cancelled successfully. Slot is now reopened.' };
   };
 
+  const rescheduleAppointment = (
+    appointmentId: string,
+    newDate: string,
+    newSlot: TimeSlot,
+    forceLateWithFee: boolean = false
+  ): {
+    success: boolean;
+    message: string;
+    appointment?: Appointment;
+    noShowAppointment?: Appointment;
+    isLate?: boolean;
+    fee?: number;
+  } => {
+    const appt = appointments.find((a) => a.id === appointmentId);
+    if (!appt) return { success: false, message: 'Appointment not found' };
+
+    const check = isCancellationAllowed(
+      appt.date,
+      appt.startTime,
+      settings.cancellationPolicyHours,
+      settings.allowUnrestrictedCancellation
+    );
+
+    const isLate = !check.allowed;
+
+    const service = settings.services.find((s) => s.id === appt.serviceId);
+    const serviceRate =
+      service && typeof service.basePrice === 'number'
+        ? service.basePrice
+        : typeof appt.price === 'number' && appt.price > 0
+        ? appt.price
+        : (settings.standardHourlyRate || 65) * (appt.durationMinutes / 60);
+
+    if (isLate && !forceLateWithFee) {
+      return {
+        success: false,
+        message: `This appointment falls within the cancellation cutoff window (< ${settings.cancellationPolicyHours} hours). The cost will be charged as a no-show. Confirmation required.`,
+        isLate: true,
+        fee: serviceRate,
+      };
+    }
+
+    if (isLate) {
+      const hadPackage = !!appt.packageId;
+      const sessionCost = serviceRate;
+      let linkedPackage = hadPackage
+        ? clientPackages.find((cp) => cp.id === appt.packageId)
+        : undefined;
+
+      // If the originally linked package is missing or has insufficient value, look for an active package with enough value
+      if (hadPackage && (!linkedPackage || getPackageRemainingValue(linkedPackage) < sessionCost)) {
+        linkedPackage = clientPackages.find(
+          (cp) => cp.clientId === appt.clientId && getPackageRemainingValue(cp) >= sessionCost && cp.status === 'active'
+        );
+      }
+
+      const canDeductAgainFromPackage =
+        hadPackage && Boolean(linkedPackage && getPackageRemainingValue(linkedPackage) >= sessionCost);
+
+      if (canDeductAgainFromPackage && linkedPackage) {
+        // 1. Deduct session cost in Euro again from the package for the new rescheduled session!
+        const curVal = getPackageRemainingValue(linkedPackage);
+        const updatedRemainingVal = Math.max(0, Math.round((curVal - sessionCost) * 100) / 100);
+        const stdDuration = linkedPackage.sessionDurationMinutes || settings.standardSlotDuration || 60;
+        const rate = settings.standardHourlyRate || 65;
+        const sessionWorth = Math.max(1, (stdDuration / 60) * rate);
+        const approxSessions = Math.max(0, Math.round((updatedRemainingVal / sessionWorth) * 10) / 10);
+
+        setClientPackages((prev) =>
+          prev.map((cp) =>
+            cp.id === linkedPackage!.id
+              ? {
+                  ...cp,
+                  remainingValue: updatedRemainingVal,
+                  remainingSessions: approxSessions,
+                  status: updatedRemainingVal === 0 ? 'exhausted' : cp.status,
+                }
+              : cp
+          )
+        );
+
+        // 2. Mark original appointment as no-show.
+        // Since it was covered by package, the euro value was consumed as no-show penalty.
+        // The trainer has NOTHING to invoice for it!
+        const originalUpdated: Appointment = {
+          ...appt,
+          status: 'no-show',
+          cancellationReason: `Late reschedule by client (< ${settings.cancellationPolicyHours}h prior to start) - Package value (€${(appt.packageValueDeducted ?? sessionCost).toFixed(2)}) retained`,
+          cancelledAt: new Date().toISOString(),
+          billingStatus: 'paid',
+          price: 0,
+        };
+
+        // 3. Create the newly scheduled appointment, covered by the package!
+        // The trainer has NOTHING to invoice for this either!
+        const newAppt: Appointment = {
+          id: `apt-${Date.now()}`,
+          clientId: appt.clientId,
+          serviceId: appt.serviceId,
+          date: newDate,
+          startTime: newSlot.startTime,
+          endTime: newSlot.endTime,
+          durationMinutes: appt.durationMinutes,
+          price: 0,
+          status: 'reserved',
+          createdAt: formatDateISO(new Date()),
+          packageId: linkedPackage.id,
+          packageName: linkedPackage.packageName,
+          packageValueDeducted: sessionCost,
+          packageSessionsDeducted: appt.packageSessionsDeducted ?? 1,
+          billingStatus: 'paid',
+        };
+
+        setAppointments((prev) =>
+          prev.map((a) => (a.id === appointmentId ? originalUpdated : a)).concat(newAppt)
+        );
+
+        return {
+          success: true,
+          message: `Appointment successfully rescheduled to ${newDate} at ${newSlot.startTime}. Because the previous session was booked via your package (${linkedPackage.packageName}), the previous credit was retained as a no-show and €${sessionCost.toFixed(2)} was deducted again from your package balance (€${updatedRemainingVal.toFixed(2)} remaining). The trainer will not bill any additional invoice.`,
+          appointment: newAppt,
+          noShowAppointment: originalUpdated,
+          isLate: true,
+          fee: 0,
+        };
+      } else if (hadPackage) {
+        // Had package, but insufficient package value left to deduct again
+        const originalUpdated: Appointment = {
+          ...appt,
+          status: 'no-show',
+          cancellationReason: `Late reschedule by client (< ${settings.cancellationPolicyHours}h prior to start) - Package credit retained`,
+          cancelledAt: new Date().toISOString(),
+          billingStatus: 'paid',
+          price: 0,
+        };
+
+        const newAppt: Appointment = {
+          id: `apt-${Date.now()}`,
+          clientId: appt.clientId,
+          serviceId: appt.serviceId,
+          date: newDate,
+          startTime: newSlot.startTime,
+          endTime: newSlot.endTime,
+          durationMinutes: appt.durationMinutes,
+          price: serviceRate,
+          status: 'reserved',
+          createdAt: formatDateISO(new Date()),
+          billingStatus: 'to_invoice',
+        };
+
+        setAppointments((prev) =>
+          prev.map((a) => (a.id === appointmentId ? originalUpdated : a)).concat(newAppt)
+        );
+
+        return {
+          success: true,
+          message: `Appointment rescheduled to ${newDate} at ${newSlot.startTime}. The previous session credit was retained as a no-show. Because your package balance is depleted, the new appointment is booked at the standard rate.`,
+          appointment: newAppt,
+          noShowAppointment: originalUpdated,
+          isLate: true,
+          fee: serviceRate,
+        };
+      } else {
+        // Standard session: trainer invoices no-show fee
+        const originalUpdated: Appointment = {
+          ...appt,
+          status: 'no-show',
+          cancellationReason: `Late reschedule by client (< ${settings.cancellationPolicyHours}h prior to start)`,
+          cancelledAt: new Date().toISOString(),
+          billingStatus: 'to_invoice',
+          price: serviceRate,
+        };
+
+        const newAppt: Appointment = {
+          id: `apt-${Date.now()}`,
+          clientId: appt.clientId,
+          serviceId: appt.serviceId,
+          date: newDate,
+          startTime: newSlot.startTime,
+          endTime: newSlot.endTime,
+          durationMinutes: appt.durationMinutes,
+          price: serviceRate,
+          status: 'reserved',
+          createdAt: formatDateISO(new Date()),
+          billingStatus: 'to_invoice',
+        };
+
+        setAppointments((prev) =>
+          prev.map((a) => (a.id === appointmentId ? originalUpdated : a)).concat(newAppt)
+        );
+
+        return {
+          success: true,
+          message: `Appointment rescheduled to ${newDate} at ${newSlot.startTime}. The previous session is recorded as a no-show and will be invoiced in accordance with the cancellation policy.`,
+          appointment: newAppt,
+          noShowAppointment: originalUpdated,
+          isLate: true,
+          fee: serviceRate,
+        };
+      }
+    } else {
+      // Timely reschedule: update existing appointment date & time slot
+      const updatedAppt: Appointment = {
+        ...appt,
+        date: newDate,
+        startTime: newSlot.startTime,
+        endTime: newSlot.endTime,
+      };
+
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === appointmentId ? updatedAppt : a))
+      );
+
+      return {
+        success: true,
+        message: `Appointment successfully rescheduled to ${newDate} at ${newSlot.startTime}.`,
+        appointment: updatedAppt,
+        isLate: false,
+      };
+    }
+  };
+
   const updateAppointmentStatus = (
     appointmentId: string,
     status: AppointmentStatus,
@@ -2535,7 +3189,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
               status,
               completionNotes: completionNotes !== undefined ? completionNotes : a.completionNotes,
               billingStatus:
-                status === 'delivered'
+                status === 'delivered' || status === 'no-show'
                   ? a.billingStatus || 'to_invoice'
                   : a.billingStatus,
             }
@@ -2754,6 +3408,83 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setGroupSessions((prev) => prev.filter((gs) => gs.id !== id));
   };
 
+  const addGroupSessionTemplate = (
+    template: Omit<GroupSessionTemplate, 'id' | 'createdAt'>
+  ): GroupSessionTemplate => {
+    const newTmpl: GroupSessionTemplate = {
+      ...template,
+      id: `tmpl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: formatDateISO(new Date()),
+    };
+    setGroupSessionTemplates((prev) => [newTmpl, ...prev]);
+    return newTmpl;
+  };
+
+  const updateGroupSessionTemplate = (id: string, updates: Partial<GroupSessionTemplate>) => {
+    setGroupSessionTemplates((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+  };
+
+  const deleteGroupSessionTemplate = (id: string) => {
+    setGroupSessionTemplates((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const addGroupSessionsBatch = (
+    sessionsData: Array<
+      Omit<GroupSession, 'id' | 'createdAt' | 'participants'> & {
+        participants?: GroupSessionParticipant[];
+      }
+    >
+  ): GroupSession[] => {
+    const created: GroupSession[] = [];
+    const newAppts: Appointment[] = [];
+    const nowIso = formatDateISO(new Date());
+
+    sessionsData.forEach((data, index) => {
+      const gsId = `grp-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`;
+      const newGs: GroupSession = {
+        ...data,
+        id: gsId,
+        status: data.status || 'scheduled',
+        participants: data.participants || [],
+        createdAt: nowIso,
+      };
+      created.push(newGs);
+
+      if (newGs.participants && newGs.participants.length > 0) {
+        newGs.participants
+          .filter((p) => p.status === 'confirmed')
+          .forEach((p) => {
+            newAppts.push({
+              id: `apt-grp-${Date.now()}-${index}-${p.clientId}`,
+              clientId: p.clientId,
+              serviceId: newGs.serviceId || 'grp-service',
+              date: newGs.date,
+              startTime: newGs.startTime,
+              endTime: newGs.endTime,
+              durationMinutes: newGs.durationMinutes,
+              price: p.price ?? newGs.price,
+              status: 'reserved',
+              createdAt: nowIso,
+              isGroupSession: true,
+              groupSessionId: newGs.id,
+              groupSessionTitle: newGs.title,
+              maxParticipants: newGs.maxParticipants,
+              packageId: p.packageId,
+              packageName: p.packageName,
+            });
+          });
+      }
+    });
+
+    if (newAppts.length > 0) {
+      setAppointments((prev) => [...newAppts, ...prev]);
+    }
+    setGroupSessions((prev) => [...created, ...prev]);
+    return created;
+  };
+
   const bookGroupSessionSpot = (
     groupSessionId: string,
     clientId: string,
@@ -2809,10 +3540,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
           message: 'Selected package was not found.',
         };
       }
-      if (usedPackage.remainingSessions < 1) {
+      const remVal = getPackageRemainingValue(usedPackage);
+      if (remVal <= 0 || (remVal + 0.001 < gs.price && usedPackage.remainingSessions <= 0)) {
         return {
           success: false,
-          message: 'Insufficient sessions remaining on this package.',
+          message: `The selected package has insufficient balance (€${remVal.toFixed(2)} remaining, rate: €${gs.price.toFixed(2)}).`,
         };
       }
       if (usedPackage.expiresAt && usedPackage.expiresAt < gs.date) {
@@ -2835,6 +3567,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       appointmentId: apptId,
       packageId: usedPackage?.id,
       packageName: usedPackage?.packageName,
+      packageValueDeducted: usedPackage ? gs.price : undefined,
       price,
       status: 'confirmed',
     };
@@ -2856,19 +3589,27 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       maxParticipants: gs.maxParticipants,
       packageId: usedPackage?.id,
       packageName: usedPackage?.packageName,
+      packageValueDeducted: usedPackage ? gs.price : undefined,
       packageSessionsDeducted: usedPackage ? 1 : undefined,
     };
 
-    // Deduct package credit if used
+    // Deduct group session price in Euro from package value
     if (usedPackage) {
-      const remainingAfter = Math.max(0, Math.round((usedPackage.remainingSessions - 1) * 100) / 100);
+      const curVal = getPackageRemainingValue(usedPackage);
+      const remainingValAfter = Math.max(0, Math.round((curVal - gs.price) * 100) / 100);
+      const stdDuration = usedPackage.sessionDurationMinutes || settings.standardSlotDuration || 60;
+      const rate = settings.standardHourlyRate || 65;
+      const sessionWorth = Math.max(1, (stdDuration / 60) * rate);
+      const approxSessions = Math.max(0, Math.round((remainingValAfter / sessionWorth) * 10) / 10);
+
       setClientPackages((prev) =>
         prev.map((cp) =>
           cp.id === usedPackage!.id
             ? {
                 ...cp,
-                remainingSessions: remainingAfter,
-                status: remainingAfter === 0 ? 'exhausted' : cp.status,
+                remainingValue: remainingValAfter,
+                remainingSessions: approxSessions,
+                status: remainingValAfter === 0 ? 'exhausted' : cp.status,
               }
             : cp
         )
@@ -2935,16 +3676,24 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
     }
 
-    // Restore package credit if used
+    // Restore package euro value and credits if used
     if (participant.packageId) {
+      const refundAmount = participant.packageValueDeducted ?? gs.price;
       setClientPackages((prev) =>
         prev.map((cp) => {
           if (cp.id === participant.packageId) {
-            const restored = Math.round((cp.remainingSessions + 1) * 100) / 100;
+            const curVal = getPackageRemainingValue(cp);
+            const updatedValue = Math.round((curVal + refundAmount) * 100) / 100;
+            const stdDuration = cp.sessionDurationMinutes || settings.standardSlotDuration || 60;
+            const rate = settings.standardHourlyRate || 65;
+            const sessionWorth = Math.max(1, (stdDuration / 60) * rate);
+            const approxSessions = Math.max(0, Math.round((updatedValue / sessionWorth) * 10) / 10);
+
             return {
               ...cp,
-              remainingSessions: restored,
-              status: restored > 0 ? 'active' : cp.status,
+              remainingValue: updatedValue,
+              remainingSessions: approxSessions,
+              status: updatedValue > 0 ? 'active' : cp.status,
             };
           }
           return cp;
@@ -3132,18 +3881,36 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     (targetClientId?: string): BillingItem[] => {
       const items: BillingItem[] = [];
 
-      // 1. Delivered appointments
+      // 1. Delivered and No-Show appointments
       appointments.forEach((appt) => {
-        if (appt.status === 'delivered') {
+        if (appt.status === 'delivered' || appt.status === 'no-show') {
           if (targetClientId && appt.clientId !== targetClientId) return;
           const client = clients.find((c) => c.id === appt.clientId);
           const service = settings.services.find((s) => s.id === appt.serviceId);
+          const isNoShow = appt.status === 'no-show';
           const isCovered = !!appt.packageId;
 
-          const hasCustomRate = client?.customHourlyRate !== undefined && client?.customHourlyRate > 0;
-          const isVatInclusive = hasCustomRate
-            ? client?.customHourlyRateIncludesVat ?? (settings.ratesIncludeVat ?? true)
-            : settings.ratesIncludeVat ?? true;
+          // Invoicing moet altijd uitgaan van het tarief van de service type (of opgeslagen afspraakprijs)
+          const serviceRate =
+            service && typeof service.basePrice === 'number'
+              ? service.basePrice
+              : typeof appt.price === 'number' && appt.price > 0
+              ? appt.price
+              : (settings.standardHourlyRate || 65) * (appt.durationMinutes / 60);
+
+          const isVatInclusive = settings.ratesIncludeVat ?? true;
+
+          const title = isNoShow
+            ? `${service?.name || 'Session'} (No-Show)`
+            : (service?.name || 'Personal Training');
+
+          const description = isNoShow
+            ? `No-show / Late cancellation on ${appt.date} (${appt.startTime} - ${appt.endTime})${
+                appt.cancellationReason ? ` • ${appt.cancellationReason}` : ''
+              }`
+            : `${appt.durationMinutes} min (${appt.startTime} - ${appt.endTime})${
+                isCovered ? ` • ${appt.packageName || 'Package'}` : ''
+              }${appt.completionNotes ? ` • ${appt.completionNotes}` : ''}`;
 
           items.push({
             id: `appt-${appt.id}`,
@@ -3153,13 +3920,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
             clientName: client?.name || 'Client',
             clientEmail: client?.email,
             date: appt.date,
-            title: service?.name || 'Personal Training',
-            description: `${appt.durationMinutes} min (${appt.startTime} - ${appt.endTime})${
-              isCovered ? ` • ${appt.packageName || 'Package'}` : ''
-            }${appt.completionNotes ? ` • ${appt.completionNotes}` : ''}`,
-            amount: isCovered ? 0 : appt.price,
+            title,
+            description,
+            amount: isCovered ? 0 : serviceRate,
             isVatInclusive,
-            status: appt.billingStatus || 'to_invoice',
+            status: appt.billingStatus || (isCovered ? 'paid' : 'to_invoice'),
             invoicedAt: appt.invoicedAt,
             paidAt: appt.paidAt,
             invoiceNumber: appt.invoiceNumber,
@@ -3205,11 +3970,19 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     let total = 0;
 
     appointments.forEach((a) => {
-      if (a.status === 'delivered') {
+      if (a.status === 'delivered' || a.status === 'no-show') {
         const isToInvoice = !a.billingStatus || a.billingStatus === 'to_invoice';
-        if (isToInvoice && !a.packageId && a.price > 0) {
+        const isCovered = !!a.packageId;
+        if (isToInvoice && !isCovered) {
+          const srv = settings.services.find((s) => s.id === a.serviceId);
+          const fee =
+            srv && typeof srv.basePrice === 'number'
+              ? srv.basePrice
+              : typeof a.price === 'number' && a.price > 0
+              ? a.price
+              : (settings.standardHourlyRate || 65) * (a.durationMinutes / 60);
           count++;
-          total += a.price;
+          total += Math.max(0, fee);
         }
       }
     });
@@ -3326,6 +4099,10 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Invoicing & Administration
   const updateInvoiceSettings = (updates: Partial<InvoiceSettings>) => {
+    try {
+      localStorage.setItem('probooking_settings_configured', 'true');
+    } catch {}
+    setSettings((prev) => ({ ...prev, hasSavedSettings: true }));
     setInvoiceSettings((prev) => {
       const next = { ...prev, ...updates };
       const hasTaxId = Boolean(next.taxId && next.taxId.trim().length > 0);
@@ -3608,6 +4385,9 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const resetDemoData = () => {
+    const uid = auth.currentUser?.uid || currentUser?.uid;
+    clearDemoDataClearedFlag(uid);
+
     const restoredSettings: ProviderSettings = {
       ...initialSettings,
       name: settings.name,
@@ -3626,6 +4406,9 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const prefixes = [userStoragePrefix, LOCAL_STORAGE_KEY];
+    if (uid) {
+      prefixes.push(`${LOCAL_STORAGE_KEY}_${uid}`);
+    }
     prefixes.forEach((prefix) => {
       localStorage.setItem(`${prefix}_settings`, JSON.stringify(restoredSettings));
       localStorage.setItem(`${prefix}_clients`, JSON.stringify(initialClients));
@@ -3651,16 +4434,28 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSelectedChatClientId('cli-1');
     setRole('provider');
     setActiveClientId('cli-1');
+
+    if (uid) {
+      setDoc(doc(db, 'users', uid), { demoDataCleared: false }, { merge: true }).catch(() => {});
+      setDoc(doc(db, 'trainers', uid), { demoDataCleared: false }, { merge: true }).catch(() => {});
+    }
   };
 
   const clearDemoData = async (): Promise<void> => {
+    const uid = auth.currentUser?.uid || currentUser?.uid;
+    markDemoDataCleared(uid);
+
     const cleanSettings: ProviderSettings = {
       ...settings,
       adHocSchedule: [],
       exceptions: [],
       services: [],
       availabilityMode: 'adhoc',
+      hasSavedSettings: false,
     };
+    try {
+      localStorage.removeItem('probooking_settings_configured');
+    } catch {}
 
     const cleanInvoiceSettings: InvoiceSettings = {
       ...invoiceSettings,
@@ -3678,9 +4473,13 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
       clientPackages,
       messages,
       invoices,
+      groupSessions,
     };
 
     const prefixes = [userStoragePrefix, LOCAL_STORAGE_KEY];
+    if (uid) {
+      prefixes.push(`${LOCAL_STORAGE_KEY}_${uid}`);
+    }
     prefixes.forEach((prefix) => {
       localStorage.setItem(`${prefix}_settings`, JSON.stringify(cleanSettings));
       localStorage.setItem(`${prefix}_clients`, JSON.stringify([]));
@@ -3707,77 +4506,9 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     setActiveClientId('');
     setRole('provider');
 
-    const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    const collectionNames = [
-      'clients',
-      'appointments',
-      'availability',
-      'exceptions',
-      'services',
-      'packages',
-      'clientPackages',
-      'messages',
-      'invoices',
-    ];
-
     try {
-      await Promise.all(
-        collectionNames.map(async (colName) => {
-          const deletePromises: Promise<unknown>[] = [];
-          try {
-            const userSubSnap = await getDocs(collection(db, 'users', uid, colName));
-            userSubSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-          } catch {
-            // fallback to known items
-          }
-
-          try {
-            const subSnap = await getDocs(collection(db, 'trainers', uid, colName));
-            subSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-          } catch {
-            // fallback to known items
-          }
-
-          const knownItems = knownItemsByCollection[colName] || [];
-          for (const item of knownItems) {
-            if (item?.id) {
-              deletePromises.push(
-                deleteDoc(doc(db, 'users', uid, colName, item.id)).catch(() => {}),
-                deleteDoc(doc(db, 'trainers', uid, colName, item.id)).catch(() => {})
-              );
-            }
-          }
-
-          if (deletePromises.length > 0) {
-            await Promise.all(deletePromises);
-          }
-        })
-      );
-
-      await Promise.all(
-        collectionNames.map(async (colName) => {
-          try {
-            const q = query(collection(db, colName), where('trainerId', '==', uid));
-            const topSnap = await getDocs(q);
-            const deletePromises: Promise<unknown>[] = [];
-            topSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-            if (deletePromises.length > 0) {
-              await Promise.all(deletePromises);
-            }
-          } catch {
-            // ignore
-          }
-        })
-      );
-
       const cleanPayload = {
         uid,
         name: cleanSettings.name,
@@ -3787,17 +4518,69 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         standardHourlyRate: cleanSettings.standardHourlyRate,
         settings: cleanSettings,
         invoiceSettings: cleanInvoiceSettings,
+        demoDataCleared: true,
         clients: [],
         appointments: [],
         packages: [],
         clientPackages: [],
         messages: [],
         invoices: [],
+        groupSessions: [],
         updatedAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'users', uid), cleanPayload, { merge: true });
-      setDoc(doc(db, 'trainers', uid), cleanPayload, { merge: true }).catch(() => {});
+      // Fast write: commit clean root documents first (returns in ~100ms)
+      await Promise.all([
+        setDoc(doc(db, 'users', uid), cleanPayload, { merge: true }),
+        setDoc(doc(db, 'trainers', uid), cleanPayload, { merge: true }).catch(() => {}),
+      ]);
+
+      // Background cleanup: asynchronously clean up subcollections without blocking the UI
+      (async () => {
+        try {
+          const subcollectionsToCheck = [
+            'clients',
+            'appointments',
+            'availability',
+            'exceptions',
+            'services',
+            'packages',
+            'clientPackages',
+            'messages',
+            'invoices',
+            'groupSessions',
+          ];
+
+          const userSubSnaps = await Promise.all(
+            subcollectionsToCheck.map((colName) =>
+              getDocs(collection(db, 'users', uid, colName)).catch(() => null)
+            )
+          );
+
+          const refsToDelete: DocumentReference[] = [];
+          userSubSnaps.forEach((snap) => {
+            if (snap) {
+              snap.docs.forEach((d) => refsToDelete.push(d.ref));
+            }
+          });
+
+          if (refsToDelete.length > 0) {
+            const chunkSize = 200;
+            for (let i = 0; i < refsToDelete.length; i += chunkSize) {
+              const chunk = refsToDelete.slice(i, i + chunkSize);
+              const batch = writeBatch(db);
+              chunk.forEach((ref) => batch.delete(ref));
+              try {
+                await batch.commit();
+              } catch {
+                await Promise.all(chunk.map((ref) => deleteDoc(ref).catch(() => {})));
+              }
+            }
+          }
+        } catch {
+          // Ignore background cleanup errors
+        }
+      })();
     } catch (err) {
       formatFirestoreError(err, OperationType.WRITE, `users/${uid}`);
     }
@@ -4048,70 +4831,66 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     try {
-      // 3. Delete all subcollection documents under users/{uid}/{subcollection} and trainers/{uid}/{subcollection}
-      await Promise.all(
-        collectionNames.map(async (colName) => {
-          const deletePromises: Promise<unknown>[] = [];
+      // 3. Fetch subcollection documents in parallel across all collections
+      const [userSubSnaps, trainerSubSnaps] = await Promise.all([
+        Promise.all(
+          collectionNames.map((colName) =>
+            getDocs(collection(db, 'users', uid, colName)).catch(() => null)
+          )
+        ),
+        Promise.all(
+          collectionNames.map((colName) =>
+            getDocs(collection(db, 'trainers', uid, colName)).catch(() => null)
+          )
+        ),
+      ]);
 
-          try {
-            const userSubSnap = await getDocs(collection(db, 'users', uid, colName));
-            userSubSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-          } catch {
-            // Fallback to known state item IDs if listing subcollection fails
+      // 4. Aggregate all document references to delete (deduplicated by path)
+      const refsToDelete = new Map<string, DocumentReference>();
+
+      userSubSnaps.forEach((snap) => {
+        if (snap) {
+          snap.docs.forEach((d) => refsToDelete.set(d.ref.path, d.ref));
+        }
+      });
+
+      trainerSubSnaps.forEach((snap) => {
+        if (snap) {
+          snap.docs.forEach((d) => refsToDelete.set(d.ref.path, d.ref));
+        }
+      });
+
+      // Fallback to known state item IDs
+      collectionNames.forEach((colName) => {
+        const knownItems = knownItemsByCollection[colName] || [];
+        for (const item of knownItems) {
+          if (item?.id) {
+            const uRef = doc(db, 'users', uid, colName, item.id);
+            refsToDelete.set(uRef.path, uRef);
+            const tRef = doc(db, 'trainers', uid, colName, item.id);
+            refsToDelete.set(tRef.path, tRef);
           }
+        }
+      });
 
-          try {
-            const subSnap = await getDocs(collection(db, 'trainers', uid, colName));
-            subSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-          } catch {
-            // Fallback to known state item IDs if listing subcollection fails
-          }
+      // Also add root documents to delete
+      const rootUserRef = doc(db, 'users', uid);
+      refsToDelete.set(rootUserRef.path, rootUserRef);
+      const rootTrainerRef = doc(db, 'trainers', uid);
+      refsToDelete.set(rootTrainerRef.path, rootTrainerRef);
 
-          const knownItems = knownItemsByCollection[colName] || [];
-          for (const item of knownItems) {
-            if (item?.id) {
-              deletePromises.push(
-                deleteDoc(doc(db, 'users', uid, colName, item.id)).catch(() => {}),
-                deleteDoc(doc(db, 'trainers', uid, colName, item.id)).catch(() => {})
-              );
-            }
-          }
-
-          if (deletePromises.length > 0) {
-            await Promise.all(deletePromises);
-          }
-        })
-      );
-
-      // 4. Delete all mirrored documents in top-level collections where trainerId == uid
-      await Promise.all(
-        collectionNames.map(async (colName) => {
-          try {
-            const q = query(collection(db, colName), where('trainerId', '==', uid));
-            const topSnap = await getDocs(q);
-            const deletePromises: Promise<unknown>[] = [];
-            topSnap.forEach((docSnap) => {
-              deletePromises.push(deleteDoc(docSnap.ref).catch(() => {}));
-            });
-            if (deletePromises.length > 0) {
-              await Promise.all(deletePromises);
-            }
-          } catch {
-            // Ignore if collection does not exist or has no matching documents
-          }
-        })
-      );
-
-      // 5. Delete the root trainer document users/{uid} and trainers/{uid}
-      try {
-        await deleteDoc(doc(db, 'users', uid));
-        await deleteDoc(doc(db, 'trainers', uid)).catch(() => {});
-      } catch (err) {
-        formatFirestoreError(err, OperationType.DELETE, `users/${uid}`);
+      // Commit all deletions in chunks using writeBatch with fallback
+      const allRefs = Array.from(refsToDelete.values());
+      const chunkSize = 200;
+      for (let i = 0; i < allRefs.length; i += chunkSize) {
+        const chunk = allRefs.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((ref) => batch.delete(ref));
+        try {
+          await batch.commit();
+        } catch {
+          await Promise.all(chunk.map((ref) => deleteDoc(ref).catch(() => {})));
+        }
       }
 
       // 6. Clean up all localStorage keys associated with this user
@@ -4190,6 +4969,8 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         getClientActivePackages,
         getPackageStandardDuration,
         calculatePackageCreditsForDuration,
+        getPackageRemainingValue,
+        getPackageTotalValue,
         adjustClientPackageBalance,
         grantClientPackage,
         updateClientPackage,
@@ -4217,6 +4998,7 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         appointments,
         bookAppointment,
         cancelAppointment,
+        rescheduleAppointment,
         updateAppointmentStatus,
         updateAppointment,
         deleteAppointment,
@@ -4228,6 +5010,11 @@ export const BookingProvider: React.FC<{ children: ReactNode }> = ({ children })
         cancelGroupSessionSpot,
         isClientInGroupSession,
         getGroupSessionSpotsLeft,
+        groupSessionTemplates,
+        addGroupSessionTemplate,
+        updateGroupSessionTemplate,
+        deleteGroupSessionTemplate,
+        addGroupSessionsBatch,
         updateBillingItemStatus,
         bulkUpdateBillingStatus,
         getBillingItems,

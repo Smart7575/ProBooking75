@@ -2,10 +2,8 @@ import React from 'react';
 import { useBooking } from '../context/BookingContext';
 import {
   Menu,
-  ExternalLink,
   User,
   LayoutDashboard,
-  LogOut,
   Calendar,
   Users,
   Receipt,
@@ -15,8 +13,6 @@ import {
   BarChart3,
   Settings,
 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
 import { formatFullHumanDate, getTodayISO } from '../utils/dateUtils';
 
 interface TopHeaderProps {
@@ -137,18 +133,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             <span>{formatFullHumanDate(today)}</span>
           </div>
 
-          {/* Open Webapp in Browser */}
-          <a
-            href="https://pro-booking75.vercel.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition cursor-pointer"
-            title="Open published webapp in external tab"
-          >
-            <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
-            <span className="hidden md:inline">Open Webapp</span>
-          </a>
-
           {/* Quick Client Test Trigger if in Provider role */}
           {role === 'provider' && activeClients.length > 0 && (
             <button
@@ -162,19 +146,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             >
               <User className="h-3.5 w-3.5 text-blue-600" />
               <span>Preview Client Portal</span>
-            </button>
-          )}
-
-          {/* Sign Out Button */}
-          {auth.currentUser && (
-            <button
-              type="button"
-              onClick={() => signOut(auth)}
-              title="Sign Out"
-              className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/80 hover:bg-rose-100 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-rose-700 transition cursor-pointer"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
             </button>
           )}
         </div>

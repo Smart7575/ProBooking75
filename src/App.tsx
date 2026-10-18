@@ -89,6 +89,7 @@ const MainLayout: React.FC = () => {
               <BillingManagement
                 initialClientId={billingFilterClientId}
                 onNavigateToClient={(clientId) => setCurrentTab('clients')}
+                onNavigateToSettings={() => setCurrentTab('settings')}
               />
             )}
             {currentTab === 'chat' && <ProviderChatView onNavigateToTab={setCurrentTab} />}

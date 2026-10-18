@@ -13,7 +13,6 @@ import {
   Database,
   LogOut,
   X,
-  ExternalLink,
   Check,
   ChevronDown,
   User,
@@ -158,17 +157,9 @@ service cloud.firestore {
               PB
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-bold tracking-tight text-white">
-                  ProBooking
-                </span>
-                <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
-                  Trainer Pro
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                {settings.profession || 'Fitness & Coaching'}
-              </p>
+              <span className="text-base font-bold tracking-tight text-white">
+                ProBooking
+              </span>
             </div>
           </div>
 
@@ -187,33 +178,18 @@ service cloud.firestore {
 
         {/* Trainer Mini Card */}
         <div className="mx-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative">
-                <div className="h-8 w-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-emerald-400 shrink-0">
-                  {settings.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative">
+              <div className="h-8 w-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-emerald-400 shrink-0">
+                {settings.name.slice(0, 2).toUpperCase()}
               </div>
-              <div className="min-w-0 truncate">
-                <h4 className="text-xs font-bold text-slate-100 truncate">
-                  {settings.name}
-                </h4>
-                <p className="text-[10px] text-slate-400 truncate">
-                  Admin Workspace
-                </p>
-              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
             </div>
-
-            <a
-              href="https://pro-booking75.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open Webapp in new browser window"
-              className="text-slate-400 hover:text-emerald-300 transition p-1"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            <div className="min-w-0 truncate">
+              <h4 className="text-xs font-bold text-slate-100 truncate">
+                {settings.name}
+              </h4>
+            </div>
           </div>
         </div>
 
@@ -221,7 +197,7 @@ service cloud.firestore {
         <nav className="px-3 space-y-4 pt-1">
           {navGroups.map((group) => (
             <div key={group.title} className="space-y-1">
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                 {group.title}
               </div>
               <div className="space-y-0.5">

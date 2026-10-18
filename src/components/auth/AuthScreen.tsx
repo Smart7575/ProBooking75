@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
-import { initialSettings, initialInvoiceSettings } from '../../data/initialData';
+import { initialSettings, initialInvoiceSettings, markDemoDataCleared } from '../../data/initialData';
 import { formatFirestoreError, OperationType } from '../../utils/firestoreErrors';
 import {
   Lock,
@@ -107,10 +107,16 @@ export const AuthScreen: React.FC = () => {
       firebaseUser.email !== 'alex@probooking.nl' &&
       firebaseUser.email !== 'mark@jansen-performance.nl';
 
+    if (cloudData?.demoDataCleared) {
+      markDemoDataCleared(uid);
+    }
+
     if (!existingCloudDoc || isExplicitRegister || hasDemoPlaceholder || !existingLocalSettings) {
       if (existingCloudDoc && !isExplicitRegister && !hasDemoPlaceholder) {
         return;
       }
+
+      markDemoDataCleared(uid);
 
       const trainerName =
         name.trim() ||
@@ -168,6 +174,7 @@ export const AuthScreen: React.FC = () => {
         messages: [],
         invoices: [],
         groupSessions: [],
+        demoDataCleared: true,
         updatedAt: new Date().toISOString(),
       };
 

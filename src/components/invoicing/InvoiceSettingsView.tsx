@@ -181,6 +181,10 @@ export const InvoiceSettingsView: React.FC = () => {
       nextCreditNoteSequenceNumber: Math.max(1, Number(form.nextCreditNoteSequenceNumber) || 1),
       paymentTermDays: Math.max(0, Number(form.paymentTermDays) || 0),
     });
+    updateSettings({ hasSavedSettings: true });
+    try {
+      localStorage.setItem('probooking_settings_configured', 'true');
+    } catch {}
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3500);
   };

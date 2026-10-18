@@ -1,4 +1,4 @@
-import { ProviderSettings, Client, Appointment, ServiceType, ScheduleException, ServicePackage, ClientPackage, ChatMessage, Invoice, InvoiceSettings, GroupSession } from '../types';
+import { ProviderSettings, Client, Appointment, ServiceType, ScheduleException, ServicePackage, ClientPackage, ChatMessage, Invoice, InvoiceSettings, GroupSession, GroupSessionTemplate } from '../types';
 import { getTodayISO, addDaysToISO } from '../utils/dateUtils';
 
 const today = getTodayISO();
@@ -84,6 +84,7 @@ export const initialSettings: ProviderSettings = {
   ],
   services: initialServices,
   sendReminderHours: [24, 1],
+  hasSavedSettings: false,
 };
 
 // Calculate birthday close to today for demo demonstration of FR-7 birthday alert
@@ -96,73 +97,78 @@ export const initialClients: Client[] = [
   {
     id: 'cli-1',
     name: 'Linda de Vries',
+    firstName: 'Linda',
+    lastName: 'de Vries',
     email: 'linda.devries@gmail.com',
     phone: '+31 6 87654321',
     address: 'Prinsengracht 412',
     postalCode: '1016 HN',
     city: 'Amsterdam',
-    country: 'Nederland',
+    country: 'Netherlands',
     dateOfBirth: lindaBirthday, // upcoming birthday within 3 days!
     notes: 'Prepares for 10K running event in November. Minor left hamstring tightness. Prefers kettlebell work.',
-    customHourlyRate: undefined, // uses standard €65
     magicToken: 'tok-linda-8492',
     createdAt: addDaysToISO(today, -60),
   },
   {
     id: 'cli-2',
     name: 'Tom Bakker',
+    firstName: 'Tom',
+    lastName: 'Bakker',
     email: 'tom.bakker@outlook.com',
     phone: '+31 6 99112233',
     address: 'Keizersgracht 118',
     postalCode: '1015 CJ',
     city: 'Amsterdam',
-    country: 'Nederland',
+    country: 'Netherlands',
     dateOfBirth: '1988-04-14',
     notes: 'Long-term corporate loyalty rate. Focus on posture correction and deadlift biomechanics.',
-    customHourlyRate: 55, // special override rate
     magicToken: 'tok-tom-3914',
     createdAt: addDaysToISO(today, -90),
   },
   {
     id: 'cli-3',
     name: 'Sarah van Dijk',
+    firstName: 'Sarah',
+    lastName: 'van Dijk',
     email: 'sarah.vandijk@hotmail.com',
     phone: '+31 6 44556677',
     address: 'Witte de Withstraat 45',
     postalCode: '3012 BP',
     city: 'Rotterdam',
-    country: 'Nederland',
+    country: 'Netherlands',
     dateOfBirth: '1995-11-20',
     notes: 'Strength progression & hypertrophy. Very punctual, prefers 09:00 sessions.',
-    customHourlyRate: undefined,
     magicToken: 'tok-sarah-1048',
     createdAt: addDaysToISO(today, -45),
   },
   {
     id: 'cli-4',
     name: 'David Miller',
+    firstName: 'David',
+    lastName: 'Miller',
     email: 'david.miller@techcorp.io',
     phone: '+31 6 11224488',
     address: 'Singel 290',
     postalCode: '1016 KH',
     city: 'Amsterdam',
-    country: 'Nederland',
+    country: 'Netherlands',
     dateOfBirth: '1984-08-05',
     notes: 'High stress executive desk job. Focus on thoracic spine extension and recovery.',
-    customHourlyRate: 70, // Premium customized rate
     magicToken: 'tok-david-7729',
     createdAt: addDaysToISO(today, -30),
   },
   {
     id: 'cli-5',
     name: 'Emma Visser',
+    firstName: 'Emma',
+    lastName: 'Visser',
     email: 'emma.visser@kpnmail.nl',
     phone: '+31 6 55889900',
     address: 'Oudegracht 88',
     city: 'Utrecht',
     dateOfBirth: '1997-03-12',
     notes: 'Beginner intake done. Wants to build consistent training habits 2x weekly.',
-    customHourlyRate: undefined,
     magicToken: 'tok-emma-5510',
     createdAt: addDaysToISO(today, -15),
   },
@@ -340,8 +346,8 @@ export const initialPackages: ServicePackage[] = [
     serviceId: undefined,
     sessionCount: 6,
     sessionDurationMinutes: 45,
-    price: 255,
-    originalValue: 300,
+    price: 234, // 20% discount on 292.50
+    originalValue: 292.5,
     validityDays: 90,
     color: '#8b5cf6',
     isActive: true,
@@ -370,6 +376,8 @@ export const initialClientPackages: ClientPackage[] = [
     packageId: 'pkg-1',
     packageName: '10-Session Strength & Conditioning Pack',
     serviceId: undefined,
+    totalValue: 650,
+    remainingValue: 455,
     totalSessions: 10,
     remainingSessions: 7,
     sessionDurationMinutes: 60,
@@ -385,6 +393,8 @@ export const initialClientPackages: ClientPackage[] = [
     packageId: 'pkg-2',
     packageName: '5-Session Performance Kickstart',
     serviceId: undefined,
+    totalValue: 325,
+    remainingValue: 130,
     totalSessions: 5,
     remainingSessions: 2,
     sessionDurationMinutes: 60,
@@ -877,5 +887,190 @@ export const initialGroupSessions: GroupSession[] = [
     ],
   },
 ];
+
+export const initialGroupSessionTemplates: GroupSessionTemplate[] = [
+  {
+    id: 'tmpl-1',
+    title: 'Small Group Strength Training',
+    durationMinutes: 60,
+    maxParticipants: 6,
+    price: 20.0,
+    location: 'Jansen Studio - Strength Zone',
+    serviceId: 'srv-1',
+    notes: 'Strength and technique training in a small group with dedicated personal guidance.',
+    createdAt: addDaysToISO(today, -10),
+  },
+  {
+    id: 'tmpl-2',
+    title: 'Outdoor Bootcamp & Conditioning',
+    durationMinutes: 60,
+    maxParticipants: 8,
+    price: 15.0,
+    location: 'Vondelpark (Meet at main entrance)',
+    serviceId: 'srv-3',
+    notes: 'Intensive outdoor workout: kettlebells, cardio and circuit training. Bring a water bottle and towel.',
+    createdAt: addDaysToISO(today, -10),
+  },
+  {
+    id: 'tmpl-3',
+    title: 'HIIT & Core Circuit',
+    durationMinutes: 45,
+    maxParticipants: 6,
+    price: 17.5,
+    location: 'Studio Hall 1',
+    serviceId: 'srv-3',
+    notes: 'Short intensive workout focused on fat burning, endurance and core stability.',
+    createdAt: addDaysToISO(today, -10),
+  },
+  {
+    id: 'tmpl-4',
+    title: 'Mobility & Recovery Workshop',
+    durationMinutes: 60,
+    maxParticipants: 5,
+    price: 25.0,
+    location: 'Studio Hall 2',
+    serviceId: 'srv-2',
+    notes: 'Targeted mobility exercises, foam rolling and breathing techniques for optimal recovery.',
+    createdAt: addDaysToISO(today, -10),
+  },
+];
+
+export const DEMO_CLIENT_IDS = new Set([
+  'cli-1',
+  'cli-2',
+  'cli-3',
+  'cli-4',
+  'cli-5',
+  'cli-demo-4',
+  'cli-demo-5',
+  'cli-demo-6',
+  'cli-demo-7',
+  'cli-demo-8',
+]);
+
+export const DEMO_APPOINTMENT_IDS = new Set([
+  'apt-1',
+  'apt-2',
+  'apt-3',
+  'apt-4',
+  'apt-5',
+  'apt-6',
+  'apt-7',
+  'apt-8',
+  'apt-9',
+  'apt-10',
+  'apt-11',
+  'apt-12',
+]);
+
+export const DEMO_PACKAGE_IDS = new Set(['pkg-1', 'pkg-2', 'pkg-3', 'pkg-4']);
+export const DEMO_CLIENT_PACKAGE_IDS = new Set(['cp-1', 'cp-2', 'cp-3', 'cp-4', 'cpkg-1', 'cpkg-2']);
+export const DEMO_MESSAGE_IDS = new Set([
+  'msg-1',
+  'msg-2',
+  'msg-3',
+  'msg-4',
+  'msg-5',
+  'msg-6',
+  'msg-7',
+  'msg-8',
+  'msg-9',
+]);
+export const DEMO_INVOICE_IDS = new Set(['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-5']);
+export const DEMO_GROUP_SESSION_IDS = new Set(['grp-1', 'grp-2', 'grp-3']);
+export const DEMO_SERVICE_IDS = new Set(['srv-1', 'srv-2', 'srv-3', 'srv-4']);
+export const DEMO_ADHOC_IDS = new Set([
+  'adhoc-0',
+  'adhoc-1',
+  'adhoc-2',
+  'adhoc-3',
+  'adhoc-4',
+  'adhoc-5',
+  'adhoc-6',
+  'adhoc-7',
+  'adhoc-8',
+  'adhoc-9',
+]);
+export const DEMO_EXCEPTION_IDS = new Set(['exc-1']);
+
+export const isDemoClientId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_CLIENT_IDS.has(id) || id.startsWith('cli-demo-');
+};
+
+export const isDemoAppointmentId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_APPOINTMENT_IDS.has(id) || id.startsWith('apt-demo-');
+};
+
+export const isDemoPackageId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_PACKAGE_IDS.has(id) || id.startsWith('pkg-demo-');
+};
+
+export const isDemoClientPackageId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_CLIENT_PACKAGE_IDS.has(id) || id.startsWith('cpkg-demo-') || id === 'cpkg-1' || id === 'cpkg-2';
+};
+
+export const isDemoMessageId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_MESSAGE_IDS.has(id) || id.startsWith('msg-demo-');
+};
+
+export const isDemoInvoiceId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_INVOICE_IDS.has(id) || id.startsWith('inv-demo-') || id === 'inv-5';
+};
+
+export const isDemoGroupSessionId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_GROUP_SESSION_IDS.has(id) || id.startsWith('grp-demo-');
+};
+
+export const isDemoServiceId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_SERVICE_IDS.has(id) || id.startsWith('srv-demo-');
+};
+
+export const isDemoAdHocId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_ADHOC_IDS.has(id) || id.startsWith('adhoc-demo-');
+};
+
+export const isDemoExceptionId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return DEMO_EXCEPTION_IDS.has(id) || id.startsWith('exc-demo-');
+};
+
+export const isDemoDataCleared = (uid?: string | null): boolean => {
+  try {
+    if (uid && localStorage.getItem(`probooking_demo_data_cleared_${uid}`) === 'true') {
+      return true;
+    }
+    if (localStorage.getItem('probooking_demo_data_cleared') === 'true') {
+      return true;
+    }
+  } catch {}
+  return false;
+};
+
+export const markDemoDataCleared = (uid?: string | null): void => {
+  try {
+    if (uid) {
+      localStorage.setItem(`probooking_demo_data_cleared_${uid}`, 'true');
+    }
+    localStorage.setItem('probooking_demo_data_cleared', 'true');
+  } catch {}
+};
+
+export const clearDemoDataClearedFlag = (uid?: string | null): void => {
+  try {
+    if (uid) {
+      localStorage.removeItem(`probooking_demo_data_cleared_${uid}`);
+    }
+    localStorage.removeItem('probooking_demo_data_cleared');
+  } catch {}
+};
 
 

@@ -536,7 +536,7 @@ export const ClientRevenueChart: React.FC<ClientRevenueChartProps> = ({
                       <p className="text-[10px] text-slate-400">
                         {c.sessionCount} sessions
                         {c.sessionCount > 0 && metricSource === 'sessions' && (
-                          <span> • Ø {formatPrice(c.avgPerSession)}/sessie</span>
+                          <span> • Ø {formatPrice(c.avgPerSession)}/session</span>
                         )}
                         {c.invoiceCount > 0 && (
                           <span> • {c.invoiceCount} invoices</span>

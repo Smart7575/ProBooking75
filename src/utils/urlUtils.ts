@@ -81,7 +81,7 @@ export const getMagicLinkDetails = (token: string, trainerId?: string): MagicLin
   const publicSharedUrl = clientMagicUrl;
 
   const explanation =
-    'Deze unieke link verwijst altijd naar https://pro-booking75.vercel.app/ en geeft de klant direct toegang tot het persoonlijke boekingsportaal zonder wachtwoord.';
+    'This unique link always points to https://pro-booking75.vercel.app/ and gives the client instant access to their personal booking portal without requiring a password.';
 
   return {
     token,

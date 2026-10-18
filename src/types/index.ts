@@ -12,6 +12,8 @@ export interface ServiceType {
 export interface Client {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   address?: string;
@@ -23,8 +25,6 @@ export interface Client {
   notes?: string; // special notes (e.g. injuries, goals)
   specialNotes?: string; // alias for notes
   avatarUrl?: string;
-  customHourlyRate?: number; // Overrides provider standard rate if set
-  customHourlyRateIncludesVat?: boolean; // true = incl. VAT, false = excl. VAT
   magicToken: string;
   isArchived?: boolean;
   createdAt: string;
@@ -83,6 +83,7 @@ export interface ProviderSettings {
   exceptions: ScheduleException[];
   services: ServiceType[];
   sendReminderHours: number[]; // e.g. [24, 1]
+  hasSavedSettings?: boolean; // false for new users until settings are configured and saved
 }
 
 export interface ServicePackage {
@@ -129,6 +130,8 @@ export interface ClientPackage {
   packageId: string;
   packageName: string;
   serviceId?: string;
+  totalValue?: number; // Standard value representing the full package value in EUR (e.g. 200, 650)
+  remainingValue?: number; // Remaining monetary balance in EUR deducted per session cost
   totalSessions: number;
   remainingSessions: number;
   sessionDurationMinutes?: number; // Standard duration of 1 session in minutes (e.g. 60)
@@ -158,6 +161,7 @@ export interface Appointment {
   cancellationReason?: string;
   packageId?: string; // ID of the ClientPackage if booked using a package
   packageName?: string; // Name of the package applied
+  packageValueDeducted?: number; // Exact amount in EUR deducted from package value for this session
   packageSessionsDeducted?: number; // Number of session credits deducted (e.g. 0.5, 1, 1.5)
   billingStatus?: BillingStatus;
   invoicedAt?: string;
@@ -178,6 +182,7 @@ export interface GroupSessionParticipant {
   appointmentId?: string;
   packageId?: string;
   packageName?: string;
+  packageValueDeducted?: number; // Exact amount in EUR deducted from package value for this session
   price: number;
   status: 'confirmed' | 'cancelled';
 }
@@ -187,16 +192,29 @@ export interface GroupSession {
   title: string;
   serviceId?: string;
   description?: string;
+  notes?: string;
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   durationMinutes: number;
-  maxParticipants: number; // Maximaal aantal deelnemers
-  price: number; // Prijs per deelnemer
+  maxParticipants: number; // Maximum participants
+  price: number; // Price per participant
   location?: string;
   status: 'scheduled' | 'completed' | 'cancelled';
   participants: GroupSessionParticipant[];
   createdAt: string;
+}
+
+export interface GroupSessionTemplate {
+  id: string;
+  title: string;
+  durationMinutes: number;
+  maxParticipants: number;
+  price: number; // Price per participant
+  location?: string;
+  serviceId?: string; // Link service
+  notes?: string; // Notes / instructions
+  createdAt?: string;
 }
 
 export interface TimeSlot {
@@ -308,7 +326,7 @@ export interface InvoiceSettings {
 }
 
 export type UserRole = 'provider' | 'client';
-export type AppLanguage = 'en';
+export type AppLanguage = 'en' | 'nl';
 
 export interface ProBookingBackupData {
   version: 1;

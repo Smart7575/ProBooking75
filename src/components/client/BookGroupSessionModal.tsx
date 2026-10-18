@@ -29,8 +29,11 @@ export const BookGroupSessionModal: React.FC<BookGroupSessionModalProps> = ({
     currentClient,
     settings,
     clientPackages,
+    getPackageRemainingValue,
+    getPackageTotalValue,
     bookGroupSessionSpot,
     formatPrice,
+    language,
   } = useBooking();
 
   const [usePackage, setUsePackage] = useState<boolean>(true);
@@ -46,12 +49,12 @@ export const BookGroupSessionModal: React.FC<BookGroupSessionModalProps> = ({
   const spotsLeft = Math.max(0, session.maxParticipants - confirmedParticipants.length);
   const isFull = spotsLeft === 0;
 
-  // Find active packages for current client with remaining sessions
+  // Find active packages for current client with sufficient remaining monetary value
   const eligiblePackages = (clientPackages || []).filter(
     (cp) =>
       cp.clientId === currentClient.id &&
       cp.status === 'active' &&
-      cp.remainingSessions >= 1 &&
+      (getPackageRemainingValue(cp) >= session.price || cp.remainingSessions >= 1) &&
       (!cp.expiresAt || cp.expiresAt >= session.date)
   );
 
@@ -193,10 +196,10 @@ export const BookGroupSessionModal: React.FC<BookGroupSessionModalProps> = ({
                 <div className="text-xs flex-1">
                   <div className="flex items-center gap-1.5 font-bold">
                     <Package className="h-3.5 w-3.5 text-purple-700" />
-                    <span>Redeem package credit</span>
+                    <span>Redeem package value</span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    1 session will be deducted from your package balance.
+                    Session cost {formatPrice(session.price)} will be deducted from your package value.
                   </p>
 
                   {usePackage && eligiblePackages.length > 1 && (
@@ -207,14 +210,14 @@ export const BookGroupSessionModal: React.FC<BookGroupSessionModalProps> = ({
                     >
                       {eligiblePackages.map((cp) => (
                         <option key={cp.id} value={cp.id}>
-                          {cp.packageName} ({cp.remainingSessions} remaining)
+                          {cp.packageName} (Balance: {formatPrice(getPackageRemainingValue(cp))} / {formatPrice(getPackageTotalValue(cp))})
                         </option>
                       ))}
                     </select>
                   )}
                   {usePackage && eligiblePackages.length === 1 && (
                     <p className="text-[11px] font-bold text-purple-800 mt-1">
-                      {eligiblePackages[0].packageName} ({eligiblePackages[0].remainingSessions} remaining)
+                      {eligiblePackages[0].packageName} (Balance: {formatPrice(getPackageRemainingValue(eligiblePackages[0]))} / {formatPrice(getPackageTotalValue(eligiblePackages[0]))})
                     </p>
                   )}
                 </div>

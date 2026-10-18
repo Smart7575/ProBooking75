@@ -4,7 +4,6 @@ import { BillingItem, BillingStatus, Invoice } from '../../types';
 import { InvoiceArchiveView } from '../invoicing/InvoiceArchiveView';
 import { CreateInvoiceModal } from '../invoicing/CreateInvoiceModal';
 import { InvoicePdfModal } from '../invoicing/InvoicePdfModal';
-import { InvoiceSettingsView } from '../invoicing/InvoiceSettingsView';
 import {
   Receipt,
   CheckCircle2,
@@ -34,11 +33,13 @@ import {
 interface BillingManagementProps {
   initialClientId?: string;
   onNavigateToClient?: (clientId: string) => void;
+  onNavigateToSettings?: () => void;
 }
 
 export const BillingManagement: React.FC<BillingManagementProps> = ({
   initialClientId,
   onNavigateToClient,
+  onNavigateToSettings,
 }) => {
   const {
     clients,
@@ -55,8 +56,8 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
     currencySymbol,
   } = useBooking();
 
-  // Navigation sub-tab: 'unbilled' | 'archive' | 'settings'
-  const [subTab, setSubTab] = useState<'unbilled' | 'archive' | 'settings'>('unbilled');
+  // Navigation sub-tab: 'unbilled' | 'archive'
+  const [subTab, setSubTab] = useState<'unbilled' | 'archive'>('unbilled');
 
   // Filters for unbilled items
   const [selectedClientId, setSelectedClientId] = useState<string>(initialClientId || 'all');
@@ -287,16 +288,18 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                 </h2>
                 {/* Module status badge */}
                 <span
-                  onClick={() => setSubTab('settings')}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold cursor-pointer transition ${
+                  onClick={onNavigateToSettings ? onNavigateToSettings : undefined}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                    onNavigateToSettings ? 'cursor-pointer hover:opacity-90' : ''
+                  } transition ${
                     invoiceSettings.enabled
-                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-100 text-slate-600'
                   }`}
                   title={
                     invoiceSettings.enabled
-                      ? ('Invoice module active - click for settings')
-                      : ('Invoice module disabled - click to enable')
+                      ? 'Invoice module active - manage in Settings'
+                      : 'Invoice module disabled - manage in Settings'
                   }
                 >
                   <span
@@ -345,7 +348,7 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
         </div>
       </div>
 
-      {/* 3 Sub-Navigation Tabs */}
+      {/* 2 Sub-Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-px overflow-x-auto">
         {/* Tab 1: Unbilled / Items to be billed */}
         <button
@@ -390,28 +393,10 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
             {invoices.length}
           </span>
         </button>
-
-        {/* Tab 3: Invoice Settings & Numbering */}
-        <button
-          onClick={() => setSubTab('settings')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
-            subTab === 'settings'
-              ? 'border-slate-800 text-slate-900'
-              : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-          }`}
-        >
-          <Settings className="h-4 w-4" />
-          <span>{t.tabBillingSettings}</span>
-          {!invoiceSettings.enabled && (
-            <span className="rounded-full bg-slate-200 text-slate-700 px-1.5 py-0.2 text-[10px]">
-              {'Off'}
-            </span>
-          )}
-        </button>
       </div>
 
       {/* Notice Banner if Invoicing Module is Disabled */}
-      {!invoiceSettings.enabled && subTab !== 'settings' && (
+      {!invoiceSettings.enabled && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-slate-100/90 p-4 border border-slate-200 text-xs text-slate-700">
           <div className="flex items-start gap-2.5">
             <Power className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
@@ -424,12 +409,24 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => updateInvoiceSettings({ enabled: true })}
-            className="self-start sm:self-auto shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition cursor-pointer shadow-2xs"
-          >
-            {t.enableInvoicingNow}
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <button
+              onClick={() => updateInvoiceSettings({ enabled: true })}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white transition cursor-pointer shadow-2xs"
+            >
+              {t.enableInvoicingNow}
+            </button>
+            {onNavigateToSettings && (
+              <button
+                type="button"
+                onClick={onNavigateToSettings}
+                className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition cursor-pointer"
+              >
+                <Settings className="h-3.5 w-3.5 inline mr-1 text-slate-500" />
+                <span>Settings</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -764,12 +761,19 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span
                                   className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                                    item.type === 'package'
+                                    item.title.toLowerCase().includes('no-show')
+                                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                      : item.type === 'package'
                                       ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                       : 'bg-blue-50 text-blue-700 border border-blue-200'
                                   }`}
                                 >
-                                  {item.type === 'package' ? (
+                                  {item.title.toLowerCase().includes('no-show') ? (
+                                    <>
+                                      <AlertCircle className="h-2.5 w-2.5" />
+                                      <span>{language === 'nl' ? 'No-Show / Te laat gewijzigd' : 'No-Show / Late Cancel'}</span>
+                                    </>
+                                  ) : item.type === 'package' ? (
                                     <>
                                       <Package className="h-2.5 w-2.5" />
                                       <span>{t.itemPackagePurchase}</span>
@@ -974,9 +978,6 @@ export const BillingManagement: React.FC<BillingManagementProps> = ({
           filterClientId={selectedClientId !== 'all' ? selectedClientId : undefined}
         />
       )}
-
-      {/* SUB-TAB 3: INVOICE SETTINGS & FORMATTING */}
-      {subTab === 'settings' && <InvoiceSettingsView />}
 
       {/* Official Invoice Creation Modal */}
       {isCreateInvoiceOpen && (

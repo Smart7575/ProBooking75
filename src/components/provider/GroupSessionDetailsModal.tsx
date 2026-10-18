@@ -276,9 +276,9 @@ export const GroupSessionDetailsModal: React.FC<GroupSessionDetailsModalProps> =
           </div>
         </div>
 
-        {currentSession.description && (
+        {(currentSession.description || currentSession.notes) && (
           <p className="mt-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
-            "{currentSession.description}"
+            "{currentSession.description || currentSession.notes}"
           </p>
         )}
 

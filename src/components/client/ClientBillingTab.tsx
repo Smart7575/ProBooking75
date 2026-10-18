@@ -424,7 +424,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                               <button
                                 onClick={() => setViewingInvoice(matchingInvoice)}
                                 className="font-mono font-bold text-blue-900 bg-blue-100 hover:bg-blue-200 px-1.5 py-0.2 rounded border border-blue-300 transition cursor-pointer flex items-center gap-1"
-                                title="Bekijk officiële PDF factuur"
+                                title="View official PDF invoice"
                               >
                                 <FileText className="h-3 w-3 text-blue-700" />
                                 <span>{item.invoiceNumber} (PDF)</span>
@@ -445,7 +445,7 @@ export const ClientBillingTab: React.FC<ClientBillingTabProps> = ({ onNavigateTo
                             <button
                               onClick={() => setViewingInvoice(matchingInvoice)}
                               className="font-mono text-[10px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-1.5 py-0.2 rounded border border-emerald-300 transition cursor-pointer flex items-center gap-1"
-                              title="Bekijk factuur"
+                              title="View invoice"
                             >
                               <FileText className="h-3 w-3" />
                               <span>{item.invoiceNumber}</span>

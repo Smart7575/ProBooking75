@@ -258,7 +258,7 @@ export const ReportingView: React.FC = () => {
               <option value="all">{t.allClients}</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} {c.customHourlyRate ? `(${formatPrice(c.customHourlyRate)}/h)` : ''}
+                  {c.name}
                 </option>
               ))}
             </select>

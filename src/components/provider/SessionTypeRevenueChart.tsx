@@ -246,7 +246,7 @@ export const SessionTypeRevenueChart: React.FC<SessionTypeRevenueChartProps> = (
                     ? 'bg-white text-blue-600 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="Donut grafiek"
+                title="Donut chart"
               >
                 <PieIcon className="h-4 w-4" />
               </button>
@@ -258,7 +258,7 @@ export const SessionTypeRevenueChart: React.FC<SessionTypeRevenueChartProps> = (
                     ? 'bg-white text-blue-600 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="Kolom grafiek"
+                title="Bar chart"
               >
                 <BarChart3 className="h-4 w-4" />
               </button>
@@ -288,7 +288,7 @@ export const SessionTypeRevenueChart: React.FC<SessionTypeRevenueChartProps> = (
               {topService ? topService.name : '-'}
             </div>
             <span className="text-[10px] text-emerald-700 font-medium">
-              {topService ? `${topService.percentage}% van omzet` : '-'}
+              {topService ? `${topService.percentage}% of revenue` : '-'}
             </span>
           </div>
 

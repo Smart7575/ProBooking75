@@ -60,6 +60,8 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     getBillingItems,
     clientPackages,
     getClientActivePackages,
+    getPackageRemainingValue,
+    getPackageTotalValue,
     packages,
     grantClientPackage,
     formatPrice,
@@ -92,8 +94,27 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     );
   };
 
+  // Helper to split and extract first and last name components
+  const getClientNameComponents = (client: { name: string; firstName?: string; lastName?: string }) => {
+    const f = (client.firstName || '').trim();
+    const l = (client.lastName || '').trim();
+    if (f || l) {
+      return { firstName: f, lastName: l };
+    }
+    const parts = (client.name || '').trim().split(/\s+/);
+    if (parts.length <= 1) {
+      return { firstName: parts[0] || '', lastName: '' };
+    }
+    return {
+      firstName: parts[0],
+      lastName: parts.slice(1).join(' '),
+    };
+  };
+
   // Form states
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     name: '',
     email: '',
     phone: '',
@@ -103,12 +124,12 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     country: 'Nederland',
     dateOfBirth: '',
     notes: '',
-    customHourlyRate: '',
-    customHourlyRateIncludesVat: settings.ratesIncludeVat ?? true,
   });
 
   const resetForm = () => {
     setFormData({
+      firstName: '',
+      lastName: '',
       name: '',
       email: '',
       phone: '',
@@ -118,8 +139,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       country: 'Nederland',
       dateOfBirth: '',
       notes: '',
-      customHourlyRate: '',
-      customHourlyRateIncludesVat: settings.ratesIncludeVat ?? true,
     });
   };
 
@@ -130,7 +149,10 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
   const handleOpenEditModal = (client: Client) => {
     setEditingClient(client);
+    const { firstName, lastName } = getClientNameComponents(client);
     setFormData({
+      firstName,
+      lastName,
       name: client.name,
       email: client.email,
       phone: client.phone,
@@ -140,18 +162,22 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       country: client.country || 'Nederland',
       dateOfBirth: client.dateOfBirth || '',
       notes: client.notes || '',
-      customHourlyRate: client.customHourlyRate !== undefined ? String(client.customHourlyRate) : '',
-      customHourlyRateIncludesVat:
-        client.customHourlyRateIncludesVat ?? (settings.ratesIncludeVat ?? true),
     });
   };
 
   const handleSubmitAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    const firstName = formData.firstName.trim();
+    const lastName = formData.lastName.trim();
+    if (!firstName && !lastName && !formData.name.trim()) return;
+
+    const fullName =
+      [firstName, lastName].filter(Boolean).join(' ').trim() || formData.name.trim();
 
     addClient({
-      name: formData.name.trim(),
+      name: fullName,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       email: formData.email.trim(),
       phone: formData.phone || '',
       address: formData.address,
@@ -160,8 +186,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       country: formData.country,
       dateOfBirth: formData.dateOfBirth || undefined,
       notes: formData.notes,
-      customHourlyRate: formData.customHourlyRate ? Number(formData.customHourlyRate) : undefined,
-      customHourlyRateIncludesVat: formData.customHourlyRateIncludesVat,
     });
 
     setIsAddModalOpen(false);
@@ -172,8 +196,15 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     e.preventDefault();
     if (!editingClient) return;
 
+    const firstName = formData.firstName.trim();
+    const lastName = formData.lastName.trim();
+    const fullName =
+      [firstName, lastName].filter(Boolean).join(' ').trim() || editingClient.name;
+
     updateClient(editingClient.id, {
-      name: formData.name,
+      name: fullName,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       email: formData.email,
       phone: formData.phone,
       address: formData.address,
@@ -182,8 +213,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
       country: formData.country,
       dateOfBirth: formData.dateOfBirth || undefined,
       notes: formData.notes,
-      customHourlyRate: formData.customHourlyRate ? Number(formData.customHourlyRate) : undefined,
-      customHourlyRateIncludesVat: formData.customHourlyRateIncludesVat,
     });
 
     setEditingClient(null);
@@ -230,17 +259,40 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
     setGrantModalClient(null);
   };
 
-  // Filtered clients list
-  const displayedClients = clients.filter((c) => {
-    const matchesArchived = filterArchived ? c.isArchived : !c.isArchived;
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      c.name.toLowerCase().includes(q) ||
-      (c.email || '').toLowerCase().includes(q) ||
-      (c.phone || '').toLowerCase().includes(q) ||
-      (c.city && c.city.toLowerCase().includes(q));
-    return matchesArchived && matchesSearch;
-  });
+  // Filtered and alphabetically sorted clients list: primary sort on lastName, secondary on firstName
+  const displayedClients = clients
+    .filter((c) => {
+      const matchesArchived = filterArchived ? c.isArchived : !c.isArchived;
+      const q = searchTerm.toLowerCase();
+      const { firstName, lastName } = getClientNameComponents(c);
+      const matchesSearch =
+        c.name.toLowerCase().includes(q) ||
+        firstName.toLowerCase().includes(q) ||
+        lastName.toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.city && c.city.toLowerCase().includes(q));
+      return matchesArchived && matchesSearch;
+    })
+    .sort((a, b) => {
+      const nameA = getClientNameComponents(a);
+      const nameB = getClientNameComponents(b);
+
+      // Primary sort: Last Name (achternaam)
+      const lastCompare = nameA.lastName.localeCompare(nameB.lastName, undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      });
+      if (lastCompare !== 0) {
+        return lastCompare;
+      }
+
+      // Secondary sort: First Name (voornaam)
+      return nameA.firstName.localeCompare(nameB.firstName, undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      });
+    });
 
   return (
     <div className="space-y-6">
@@ -439,18 +491,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-bold text-slate-900">
-                          {client.name}
+                          {(() => {
+                            const { firstName, lastName } = getClientNameComponents(client);
+                            return lastName ? `${lastName}, ${firstName}` : client.name;
+                          })()}
                         </h3>
-                      {client.customHourlyRate && (
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200" title={'Custom override rate'}>
-                          {formatPrice(client.customHourlyRate)}/h{' '}
-                          <span className="font-normal opacity-80">
-                            ({(client.customHourlyRateIncludesVat ?? settings.ratesIncludeVat ?? true)
-                              ? 'incl. VAT'
-                              : 'excl. VAT'})
-                          </span>
-                        </span>
-                      )}
                       {totalRemainingSessions > 0 ? (
                         <span
                           className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200"
@@ -564,11 +609,13 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     {clientActivePackages.length > 0 ? (
                       <div className="space-y-2">
                         {clientActivePackages.map((cp) => {
+                          const remVal = getPackageRemainingValue(cp);
+                          const totVal = getPackageTotalValue(cp);
                           const percentRemaining = Math.min(
                             100,
-                            Math.max(0, Math.round((cp.remainingSessions / cp.totalSessions) * 100))
+                            Math.max(0, Math.round((remVal / (totVal || 1)) * 100))
                           );
-                          const isLow = cp.remainingSessions <= 2;
+                          const isLow = percentRemaining <= 25;
 
                           return (
                             <div
@@ -584,7 +631,8 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                                   {cp.packageName}
                                 </span>
                                 <span className="shrink-0 text-xs font-black text-indigo-700 ml-1">
-                                  {Number(cp.remainingSessions.toFixed(2))} / {cp.totalSessions} {'left'}
+                                  {formatPrice(remVal)}{' '}
+                                  <span className="text-[10px] font-normal text-slate-400">/ {formatPrice(totVal)}</span>
                                 </span>
                               </div>
 
@@ -600,9 +648,9 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
 
                               <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 flex-wrap gap-1">
                                 <span>
-                                  {Number((cp.totalSessions - cp.remainingSessions).toFixed(2))} {'used'} •{' '}
+                                  {percentRemaining}% balance left •{' '}
                                   <strong className="text-slate-800 font-semibold">
-                                    {Number(cp.remainingSessions.toFixed(2))} {'remaining'}
+                                    deducted per session
                                   </strong>
                                 </span>
                                 {cp.expiresAt ? (
@@ -800,18 +848,33 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
             </div>
 
             <form onSubmit={handleSubmitAdd} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {t.clientName} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={'Sarah Connor'}
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {t.clientFirstName} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={'bijv. Linda'}
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {t.clientLastName} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={'bijv. de Vries'}
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -850,7 +913,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder={'123 Market Street'}
+                  placeholder={'bijv. Hoofdstraat 1'}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -860,11 +923,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {'Postal Code'}
+                    {'Postcode'}
                   </label>
                   <input
                     type="text"
-                    placeholder={'EC1A 1BB'}
+                    placeholder={'bijv. 1012 JS'}
                     value={formData.postalCode}
                     onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -876,7 +939,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder={'London'}
+                    placeholder={'bijv. Amsterdam'}
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
@@ -884,71 +947,16 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.clientDOB}
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.customRate}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder={`${'Standard'}: ${formatPrice(settings.standardHourlyRate)}`}
-                    value={formData.customHourlyRate}
-                    onChange={(e) => setFormData({ ...formData, customHourlyRate: e.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
-                  />
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={formData.customHourlyRateIncludesVat === false}
-                        onChange={() =>
-                          setFormData({ ...formData, customHourlyRateIncludesVat: false })
-                        }
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <span
-                        className={`text-[11px] font-bold ${
-                          formData.customHourlyRateIncludesVat === false
-                            ? 'text-emerald-700'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        {'Excl. VAT'}
-                      </span>
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={formData.customHourlyRateIncludesVat !== false}
-                        onChange={() =>
-                          setFormData({ ...formData, customHourlyRateIncludesVat: true })
-                        }
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <span
-                        className={`text-[11px] font-bold ${
-                          formData.customHourlyRateIncludesVat !== false
-                            ? 'text-emerald-700'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        {'Incl. VAT'}
-                      </span>
-                    </label>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {t.clientDOB}
+                </label>
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
+                />
               </div>
 
               <div>
@@ -1009,16 +1017,31 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.clientName} <span className="text-rose-500">*</span>
+                    {t.clientFirstName} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    {t.clientLastName} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     {t.clientEmail}
@@ -1030,9 +1053,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     {t.clientPhone}
@@ -1043,59 +1063,6 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {t.customRate}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder={`Standard: ${formatPrice(settings.standardHourlyRate)}`}
-                    value={formData.customHourlyRate}
-                    onChange={(e) => setFormData({ ...formData, customHourlyRate: e.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-xs text-slate-900 focus:border-emerald-500 outline-none transition"
-                  />
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={formData.customHourlyRateIncludesVat === false}
-                        onChange={() =>
-                          setFormData({ ...formData, customHourlyRateIncludesVat: false })
-                        }
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <span
-                        className={`text-[11px] font-bold ${
-                          formData.customHourlyRateIncludesVat === false
-                            ? 'text-emerald-700'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        {'Excl. VAT'}
-                      </span>
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={formData.customHourlyRateIncludesVat !== false}
-                        onChange={() =>
-                          setFormData({ ...formData, customHourlyRateIncludesVat: true })
-                        }
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                      />
-                      <span
-                        className={`text-[11px] font-bold ${
-                          formData.customHourlyRateIncludesVat !== false
-                            ? 'text-emerald-700'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        {'Incl. VAT'}
-                      </span>
-                    </label>
-                  </div>
                 </div>
               </div>
 
@@ -1114,7 +1081,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {'Postal Code'}
+                    {'Postcode'}
                   </label>
                   <input
                     type="text"

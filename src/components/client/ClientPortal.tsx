@@ -71,6 +71,8 @@ export const ClientPortal: React.FC = () => {
     clientPackages,
     getClientActivePackages,
     getPackageStandardDuration,
+    getPackageRemainingValue,
+    getPackageTotalValue,
     calculatePackageCreditsForDuration,
     purchasePackage,
     updateClientContactDetails,
@@ -78,6 +80,7 @@ export const ClientPortal: React.FC = () => {
     calculateSessionPrice,
     bookAppointment,
     cancelAppointment,
+    rescheduleAppointment,
     formatPrice,
     currency,
     setCurrency,
@@ -90,6 +93,8 @@ export const ClientPortal: React.FC = () => {
     t,
     language,
   } = useBooking();
+
+  const isNl = language === 'nl';
 
   // Navigation tab in Client Portal: 'book' | 'groups' | 'appointments' | 'packages' | 'billing' | 'chat' | 'profile'
   const [activeTab, setActiveTab] = useState<
@@ -133,8 +138,17 @@ export const ClientPortal: React.FC = () => {
     message: string;
     allowed: boolean;
     restoresPackage: boolean;
+    isLate?: boolean;
+    fee?: number;
   } | null>(null);
   const [cancelSuccessNotification, setCancelSuccessNotification] = useState<string | null>(null);
+
+  // Reschedule state
+  const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>(addDaysToISO(todayStr, 1));
+  const [rescheduleSlot, setRescheduleSlot] = useState<TimeSlot | null>(null);
+  const [lateRescheduleAccepted, setLateRescheduleAccepted] = useState<boolean>(false);
+  const [rescheduleSuccessNotification, setRescheduleSuccessNotification] = useState<string | null>(null);
 
   // Profile Form state
   const [profileForm, setProfileForm] = useState({
@@ -226,21 +240,23 @@ export const ClientPortal: React.FC = () => {
   // Client's appointments
   const clientAppointments = useMemo(() => {
     if (!currentClient) return [];
-    return appointments
-      .filter((a) => a.clientId === currentClient.id)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime));
+    return appointments.filter((a) => a.clientId === currentClient.id);
   }, [appointments, currentClient]);
 
+  // Upcoming scheduled appointments: sorted ascending by date and time (earliest first)
   const upcomingBookings = useMemo(() => {
-    return clientAppointments.filter(
-      (a) => a.status === 'reserved' && (a.date > todayStr || (a.date === todayStr && a.startTime > '00:00'))
-    );
+    return clientAppointments
+      .filter(
+        (a) => a.status === 'reserved' && (a.date > todayStr || (a.date === todayStr && a.startTime > '00:00'))
+      )
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   }, [clientAppointments, todayStr]);
 
+  // Past history: sorted descending by date and time (most recent first)
   const pastBookings = useMemo(() => {
-    return clientAppointments.filter(
-      (a) => a.status !== 'reserved' || a.date < todayStr
-    );
+    return clientAppointments
+      .filter((a) => a.status !== 'reserved' || a.date < todayStr)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime));
   }, [clientAppointments, todayStr]);
 
   // Compute upcoming group sessions
@@ -315,19 +331,31 @@ export const ClientPortal: React.FC = () => {
     );
 
     const hasPackage = !!appt.packageId;
+    const service = services.find((s) => s.id === appt.serviceId);
+    const fee =
+      service && typeof service.basePrice === 'number'
+        ? service.basePrice
+        : typeof appt.price === 'number' && appt.price > 0
+        ? appt.price
+        : (settings.standardHourlyRate || 65) * (appt.durationMinutes / 60);
 
     if (!check.allowed) {
       setCancelWarning({
         apptId: appt.id,
         allowed: false,
+        isLate: true,
+        fee,
         restoresPackage: hasPackage,
-        message: `${t.cancelBlockedMsg} (${settings.cancellationPolicyHours} hours cutoff). Please message ${settings.name} directly.`,
+        message:
+          `Notice: You are cancelling within the ${settings.cancellationPolicyHours}-hour cancellation window (${check.hoursRemaining} hours remaining). Under the cancellation policy, the session fee (${formatPrice(fee)}) will be billed as a no-show. Do you still wish to proceed?`,
       });
     } else {
       const refundedCredits = appt.packageSessionsDeducted ?? 1;
       setCancelWarning({
         apptId: appt.id,
         allowed: true,
+        isLate: false,
+        fee,
         restoresPackage: hasPackage,
         message: `Are you sure you want to cancel your session on ${appt.date} at ${appt.startTime}? ${
           hasPackage
@@ -338,13 +366,88 @@ export const ClientPortal: React.FC = () => {
     }
   };
 
-  const handleExecuteCancel = () => {
-    if (cancelWarning && cancelWarning.allowed) {
-      cancelAppointment(cancelWarning.apptId, 'Self-cancelled by client in portal');
-      setCancelWarning(null);
+  const handleExecuteCancel = (acceptLateFee: boolean = false) => {
+    if (!cancelWarning) return;
+    const res = cancelAppointment(
+      cancelWarning.apptId,
+      cancelWarning.isLate
+        ? 'Late cancellation by client in portal'
+        : 'Self-cancelled by client in portal',
+      false,
+      acceptLateFee || cancelWarning.isLate
+    );
+    setCancelWarning(null);
+    if (res.success) {
       setCancelSuccessNotification(
-        t.cancelSuccessMsg || 'Je afspraak is geannuleerd. Het tijdslot is direct weer vrijgekomen.'
+        cancelWarning.isLate
+          ? 'Your appointment has been cancelled. The session fee will be billed as a no-show per policy.'
+          : (t.cancelSuccessMsg || 'Your appointment has been cancelled. The time slot has been released.')
       );
+    }
+  };
+
+  // Reschedule helpers
+  const rescheduleService = useMemo(() => {
+    if (!reschedulingAppt) return null;
+    return services.find((s) => s.id === reschedulingAppt.serviceId) || null;
+  }, [reschedulingAppt, services]);
+
+  const rescheduleDuration = reschedulingAppt?.durationMinutes || rescheduleService?.durationMinutes || 60;
+
+  const rescheduleAvailableSlots = useMemo(() => {
+    if (!reschedulingAppt) return [];
+    return getAvailableSlotsForDate(rescheduleDate, rescheduleDuration, reschedulingAppt.id);
+  }, [reschedulingAppt, rescheduleDate, rescheduleDuration, getAvailableSlotsForDate]);
+
+  const rescheduleCancellationCheck = useMemo(() => {
+    if (!reschedulingAppt) return { allowed: true, hoursRemaining: 999, cutoffHours: 0 };
+    return isCancellationAllowed(
+      reschedulingAppt.date,
+      reschedulingAppt.startTime,
+      settings.cancellationPolicyHours,
+      settings.allowUnrestrictedCancellation
+    );
+  }, [reschedulingAppt, settings.cancellationPolicyHours, settings.allowUnrestrictedCancellation]);
+
+  const rescheduleSessionFee = useMemo(() => {
+    if (!reschedulingAppt) return 0;
+    return (
+      rescheduleService && typeof rescheduleService.basePrice === 'number'
+        ? rescheduleService.basePrice
+        : typeof reschedulingAppt.price === 'number' && reschedulingAppt.price > 0
+        ? reschedulingAppt.price
+        : (settings.standardHourlyRate || 65) * (rescheduleDuration / 60)
+    );
+  }, [reschedulingAppt, rescheduleService, rescheduleDuration, settings.standardHourlyRate]);
+
+  const handleInitiateReschedule = (appt: Appointment) => {
+    setReschedulingAppt(appt);
+    const tomorrow = addDaysToISO(todayStr, 1);
+    setRescheduleDate(appt.date > todayStr ? appt.date : tomorrow);
+    setRescheduleSlot(null);
+    setLateRescheduleAccepted(false);
+  };
+
+  const handleConfirmReschedule = () => {
+    if (!reschedulingAppt || !rescheduleSlot) return;
+
+    const isLate = !rescheduleCancellationCheck.allowed;
+    if (isLate && !lateRescheduleAccepted) {
+      return;
+    }
+
+    const res = rescheduleAppointment(
+      reschedulingAppt.id,
+      rescheduleDate,
+      rescheduleSlot,
+      isLate
+    );
+
+    if (res.success) {
+      setRescheduleSuccessNotification(res.message);
+      setReschedulingAppt(null);
+      setRescheduleSlot(null);
+      setLateRescheduleAccepted(false);
     }
   };
 
@@ -598,8 +701,8 @@ export const ClientPortal: React.FC = () => {
           <span>
             {t.portalNavPackages}
             {myClientPackages.length > 0 && (
-              <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] text-emerald-800">
-                {Math.round(myClientPackages.reduce((sum, p) => sum + p.remainingSessions, 0) * 100) / 100} left
+              <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] text-emerald-800 font-bold">
+                {formatPrice(myClientPackages.reduce((sum, p) => sum + getPackageRemainingValue(p), 0))}
               </span>
             )}
           </span>
@@ -802,10 +905,10 @@ export const ClientPortal: React.FC = () => {
                           {hasPackageCover ? (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                                {`Package (-${creditsForService} ${creditsForService === 1 ? 'session' : 'sessions'})`}
+                                {`Package (-${formatPrice(price)})`}
                               </span>
-                              <span className="text-[11px] text-slate-500">
-                                ({totalSessionsLeft} {'remaining'})
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                ({formatPrice(matchingPkgs.reduce((acc, p) => acc + getPackageRemainingValue(p), 0))} available)
                               </span>
                             </div>
                           ) : (
@@ -1145,15 +1248,7 @@ export const ClientPortal: React.FC = () => {
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
-                                {`Deduct ${creditsToDeductForSelectedService} ${
-                                      creditsToDeductForSelectedService === 1
-                                        ? 'session credit'
-                                        : 'session credits'
-                                    } from your prepaid package balance (${
-                                      selectedService.durationMinutes
-                                    } min session / ${getPackageStandardDuration(
-                                      selectedClientPackage
-                                    )} min standard package session).`}
+                                {`Session cost ${formatPrice(calculatedPrice)} will be deducted from your package value (available balance: ${formatPrice(getPackageRemainingValue(selectedClientPackage))} of ${formatPrice(getPackageTotalValue(selectedClientPackage))}).`}
                               </p>
 
                               {usePackagePayment && (
@@ -1167,16 +1262,12 @@ export const ClientPortal: React.FC = () => {
                                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 font-semibold focus:border-emerald-500"
                                   >
                                     {applicableActivePackages.map((cp) => {
-                                      const cpStdDur = getPackageStandardDuration(cp);
-                                      const cpDeduct = calculatePackageCreditsForDuration(
-                                        selectedService.durationMinutes,
-                                        cp
-                                      );
+                                      const curVal = getPackageRemainingValue(cp);
+                                      const totVal = getPackageTotalValue(cp);
                                       return (
                                         <option key={cp.id} value={cp.id}>
-                                          {cp.packageName} — ({Number(cp.remainingSessions.toFixed(2))}{' '}
-                                          sessions left • 1 session = {cpStdDur}m → -{cpDeduct}
-                                          {cp.expiresAt ? `, expires ${cp.expiresAt}` : ''})
+                                          {cp.packageName} — (Balance: {formatPrice(curVal)} / {formatPrice(totVal)} • -{formatPrice(calculatedPrice)}
+                                          {cp.expiresAt ? `, valid until ${cp.expiresAt}` : ''})
                                         </option>
                                       );
                                     })}
@@ -1279,9 +1370,7 @@ export const ClientPortal: React.FC = () => {
                     >
                       {t.confirmBookingBtn} (
                       {usePackagePayment && selectedPackageToRedeem
-                        ? `Use ${creditsToDeductForSelectedService} ${
-                            creditsToDeductForSelectedService === 1 ? 'Credit' : 'Credits'
-                          }`
+                        ? `-${formatPrice(calculatedPrice)} from package value`
                         : formatPrice(calculatedPrice)}
                       )
                     </button>
@@ -1610,6 +1699,39 @@ export const ClientPortal: React.FC = () => {
               </button>
             </div>
 
+            {/* Notifications */}
+            {rescheduleSuccessNotification && (
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5 text-xs font-semibold">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  <span>{rescheduleSuccessNotification}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRescheduleSuccessNotification(null)}
+                  className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {cancelSuccessNotification && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-800 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5 text-xs font-semibold">
+                  <CheckCircle2 className="h-5 w-5 text-slate-600 shrink-0" />
+                  <span>{cancelSuccessNotification}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCancelSuccessNotification(null)}
+                  className="text-slate-500 hover:text-slate-800 p-1 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             {upcomingBookings.length === 0 ? (
               <div className="py-10 text-center text-xs text-slate-400">
                 You have no upcoming sessions booked.
@@ -1621,10 +1743,12 @@ export const ClientPortal: React.FC = () => {
                   return (
                     <div
                       key={appt.id}
-                      className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-slate-300 transition"
+                      onClick={() => handleInitiateReschedule(appt)}
+                      className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-blue-300 hover:bg-blue-50/20 transition cursor-pointer group"
+                      title="Click to reschedule this appointment"
                     >
                       <div className="flex items-start gap-3.5">
-                        <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-900 px-3.5 py-2.5 text-emerald-400 min-w-[76px] shadow-xs">
+                        <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-900 px-3.5 py-2.5 text-emerald-400 min-w-[76px] shadow-xs group-hover:bg-blue-950 transition">
                           <span className="font-bold text-xs">{appt.startTime}</span>
                           <span className="text-[10px] text-slate-400">{appt.durationMinutes}m</span>
                         </div>
@@ -1668,17 +1792,31 @@ export const ClientPortal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
+                      <div
+                        className="flex items-center gap-2 self-end sm:self-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
+                          type="button"
+                          onClick={() => handleInitiateReschedule(appt)}
+                          className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                          title="Reschedule appointment to a different slot"
+                        >
+                          <CalendarCheck className="h-4 w-4 text-blue-600" />
+                          <span>Reschedule</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDownloadICS(appt)}
-                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 transition shadow-2xs"
+                          className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
                           title={t.addToCalendar}
                         >
                           <Download className="h-4 w-4 text-emerald-600" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleInitiateCancel(appt)}
-                          className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                         >
                           {t.cancelBookingBtn}
                         </button>
@@ -1799,8 +1937,10 @@ export const ClientPortal: React.FC = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {myClientPackages.map((cp) => {
-                  const percentage = Math.round((cp.remainingSessions / cp.totalSessions) * 100);
-                  const isAvailable = cp.remainingSessions > 0 && cp.status === 'active';
+                  const remVal = getPackageRemainingValue(cp);
+                  const totVal = getPackageTotalValue(cp);
+                  const valPercentage = Math.min(100, Math.max(0, Math.round((remVal / (totVal || 1)) * 100)));
+                  const isAvailable = remVal > 0 && cp.status === 'active';
                   const stdDuration = getPackageStandardDuration(cp);
 
                   return (
@@ -1826,34 +1966,44 @@ export const ClientPortal: React.FC = () => {
 
                         <h4 className="font-bold text-sm text-slate-900">{cp.packageName}</h4>
 
-                        {/* Progress Bar */}
+                        {/* Progress Bar & Euro Value */}
                         <div className="mt-3">
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span className="font-semibold text-slate-700">
-                              {Number(cp.remainingSessions.toFixed(2))} of {cp.totalSessions} sessions remaining
+                              Remaining balance:{' '}
+                              <strong className="text-emerald-700 font-bold">{formatPrice(remVal)}</strong>{' '}
+                              <span className="text-slate-400 font-normal">/ {formatPrice(totVal)}</span>
                             </span>
-                            <span className="font-bold text-slate-900">{percentage}%</span>
+                            <span className="font-bold text-slate-900">{valPercentage}%</span>
                           </div>
                           <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${
-                                cp.remainingSessions > 2 ? 'bg-emerald-500' : 'bg-amber-500'
+                                valPercentage > 25 ? 'bg-emerald-500' : 'bg-amber-500'
                               }`}
-                              style={{ width: `${Math.max(0, Math.min(100, percentage))}%` }}
+                              style={{ width: `${Math.max(0, Math.min(100, valPercentage))}%` }}
                             ></div>
                           </div>
                         </div>
 
                         <div className="mt-3 text-xs text-slate-500 space-y-1">
-                          <div>
-                            {'Standard session duration:'}{' '}
-                            <strong className="text-slate-700">{stdDuration} min</strong>{' '}
-                            <span className="text-[11px] text-slate-400">
-                              ({Math.round(stdDuration / 2)}m = 0.5 • {Math.round(stdDuration * 1.5)}m = 1.5)
+                          <div className="flex items-center justify-between">
+                            <span>Package Standard Value:</span>
+                            <strong className="text-slate-800 font-bold">{formatPrice(totVal)}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Price Paid:</span>
+                            <span className="text-slate-700 font-semibold">{formatPrice(cp.pricePaid)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Deduction per session:</span>
+                            <span className="text-emerald-700 font-medium">
+                              Session cost in EUR
                             </span>
                           </div>
-                          <div>
-                            Expires: <strong>{cp.expiresAt ? cp.expiresAt : t.noExpiration}</strong>
+                          <div className="flex items-center justify-between">
+                            <span>Expires:</span>
+                            <strong>{cp.expiresAt ? cp.expiresAt : t.noExpiration}</strong>
                           </div>
                         </div>
                       </div>
@@ -2187,17 +2337,25 @@ export const ClientPortal: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center gap-2.5 mb-3">
-              {cancelWarning.allowed ? (
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              {cancelWarning.isLate ? (
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+              ) : cancelWarning.allowed ? (
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
                   <AlertCircle className="h-5 w-5" />
                 </div>
               ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
                   <XCircle className="h-5 w-5" />
                 </div>
               )}
               <h3 className="text-base font-bold text-slate-900">
-                {cancelWarning.allowed ? t.cancelConfirmTitle : 'Cancellation Unavailable'}
+                {cancelWarning.isLate
+                  ? (language === 'nl' ? 'Let op: Annuleringskosten van kracht' : 'Notice: Cancellation Fee Applies')
+                  : cancelWarning.allowed
+                  ? t.cancelConfirmTitle
+                  : 'Cancellation Unavailable'}
               </h3>
             </div>
 
@@ -2207,19 +2365,255 @@ export const ClientPortal: React.FC = () => {
 
             <div className="flex items-center justify-end gap-2.5">
               <button
+                type="button"
                 onClick={() => setCancelWarning(null)}
-                className="rounded-xl px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                className="rounded-xl px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
-                {cancelWarning.allowed ? 'Keep Appointment' : t.close}
+                Keep Appointment
               </button>
-              {cancelWarning.allowed && (
+              {(cancelWarning.allowed || cancelWarning.isLate) && (
                 <button
-                  onClick={handleExecuteCancel}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 transition shadow-sm"
+                  type="button"
+                  onClick={() => handleExecuteCancel(cancelWarning.isLate)}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 transition shadow-sm cursor-pointer"
                 >
-                  Yes, Cancel
+                  {cancelWarning.isLate ? 'Yes, Cancel (with fee)' : 'Yes, Cancel'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Appointment Modal */}
+      {reschedulingAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                  <CalendarCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Reschedule Appointment
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {rescheduleService?.name} • {reschedulingAppt.durationMinutes} min
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReschedulingAppt(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Current Schedule Summary Card */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                  Current Booking
+                </span>
+                {!rescheduleCancellationCheck.allowed ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-bold border border-amber-200">
+                    <AlertCircle className="h-3 w-3 text-amber-600" />
+                    Within {settings.cancellationPolicyHours}h cutoff
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold border border-emerald-200">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    Free Reschedule
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-slate-800">
+                <span className="font-semibold text-sm">
+                  {formatFullHumanDate(reschedulingAppt.date)}
+                </span>
+                <span className="font-mono font-bold text-sm bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                  {reschedulingAppt.startTime} - {reschedulingAppt.endTime}
+                </span>
+              </div>
+              {reschedulingAppt.packageId ? (
+                <p className="text-[11px] text-emerald-700 font-medium">
+                  Booked via bundle: {reschedulingAppt.packageName || 'Package'}
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Fee: {formatPrice(rescheduleSessionFee)}
+                </p>
+              )}
+            </div>
+
+            {/* Date Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-2">
+                1. Choose a new date
+              </label>
+              {/* Quick 7-Day Picker */}
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-2.5">
+                {next7Days.map((d) => {
+                  const isSelected = rescheduleDate === d;
+                  const parsed = parseDateISO(d);
+                  const dayName = parsed.toLocaleDateString(undefined, { weekday: 'short' });
+                  const dayNumber = parsed.getDate();
+                  const monthName = parsed.toLocaleDateString(undefined, { month: 'short' });
+
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        setRescheduleDate(d);
+                        setRescheduleSlot(null);
+                      }}
+                      className={`rounded-2xl p-2 text-center border transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-emerald-400'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="block text-[10px] uppercase font-semibold opacity-75">
+                        {dayName}
+                      </span>
+                      <span className="block text-sm font-bold my-0.5">{dayNumber}</span>
+                      <span className="block text-[9px] opacity-75">{monthName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">
+                  Or custom date:
+                </span>
+                <input
+                  type="date"
+                  min={todayStr}
+                  value={rescheduleDate}
+                  onChange={(e) => {
+                    setRescheduleDate(e.target.value);
+                    setRescheduleSlot(null);
+                  }}
+                  className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-emerald-500 outline-hidden font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Slot Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-2">
+                2. Choose a new time slot ({formatHumanDate(rescheduleDate)})
+              </label>
+
+              {rescheduleAvailableSlots.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 p-5 text-center text-xs text-amber-900">
+                  <AlertCircle className="h-5 w-5 text-amber-500 mx-auto mb-1.5" />
+                  <p className="font-bold">{t.noSlotsAvailable}</p>
+                  <p className="text-slate-500 mt-0.5">
+                    No available slots on this date. Please pick another day.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
+                  {rescheduleAvailableSlots.map((slot) => {
+                    const isSelected = rescheduleSlot?.startTime === slot.startTime;
+                    return (
+                      <button
+                        key={slot.startTime}
+                        type="button"
+                        onClick={() => setRescheduleSlot(slot)}
+                        className={`rounded-xl p-2.5 text-center border font-semibold text-xs transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-md ring-2 ring-emerald-300 font-bold'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="block font-bold">{slot.startTime}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">
+                          {slot.endTime}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Cancellation Policy Check / Notice */}
+            {!rescheduleCancellationCheck.allowed ? (
+              <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 space-y-3 animate-in fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-950">
+                      Cancellation Policy in Effect (&lt; {settings.cancellationPolicyHours} hours)
+                    </h4>
+                    {reschedulingAppt.packageId ? (
+                      <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
+                        This session takes place in {rescheduleCancellationCheck.hoursRemaining} hours. Because you are rescheduling within the {settings.cancellationPolicyHours}-hour window and this session was booked with a package ({reschedulingAppt.packageName || 'Package'}), the original session credit is forfeited as a no-show, and a new session credit will be deducted from your package balance. The trainer will not bill any additional invoice.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
+                        This session takes place in {rescheduleCancellationCheck.hoursRemaining} hours. Because you are rescheduling within the {settings.cancellationPolicyHours}-hour window, the cost of the earlier session ({formatPrice(rescheduleSessionFee)}) will still be billed as a no-show by {settings.name}.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-2.5 pt-2 border-t border-amber-200/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={lateRescheduleAccepted}
+                    onChange={(e) => setLateRescheduleAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-amber-950 leading-snug">
+                    {reschedulingAppt.packageId
+                      ? `I acknowledge that the previous credit is forfeited as a no-show and that another session credit will be deducted for ${rescheduleSlot ? `${rescheduleDate} at ${rescheduleSlot.startTime}` : 'the new time'}.`
+                      : `I acknowledge that the fee for the original session will be billed and confirm rescheduling to ${rescheduleSlot ? `${rescheduleDate} at ${rescheduleSlot.startTime}` : 'the new time'}.`}
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-center gap-2.5 text-xs text-emerald-900">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>
+                  Free change: You are rescheduling more than {settings.cancellationPolicyHours} hours in advance.
+                </span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setReschedulingAppt(null)}
+                className="rounded-xl px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={!rescheduleSlot || (!rescheduleCancellationCheck.allowed && !lateRescheduleAccepted)}
+                onClick={handleConfirmReschedule}
+                className={`rounded-xl px-5 py-2.5 text-xs font-bold text-white transition shadow-sm flex items-center gap-2 ${
+                  !rescheduleSlot || (!rescheduleCancellationCheck.allowed && !lateRescheduleAccepted)
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-500 cursor-pointer shadow-emerald-600/20'
+                }`}
+              >
+                <CalendarCheck className="h-4 w-4" />
+                <span>
+                  Confirm Reschedule
+                  {rescheduleSlot ? ` (${rescheduleSlot.startTime})` : ''}
+                </span>
+              </button>
             </div>
           </div>
         </div>

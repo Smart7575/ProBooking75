@@ -93,6 +93,14 @@ export const CalendarView: React.FC = () => {
   // Group Session modal states
   const [isCreateGroupSessionOpen, setIsCreateGroupSessionOpen] = useState(false);
   const [selectedGroupSession, setSelectedGroupSession] = useState<GroupSession | null>(null);
+  const [groupSessionModalDate, setGroupSessionModalDate] = useState<string>(getTodayISO());
+  const [groupSessionModalStartTime, setGroupSessionModalStartTime] = useState<string>('18:00');
+
+  const handleOpenCreateGroupSession = (dStr?: string, sTime?: string) => {
+    setGroupSessionModalDate(dStr || formatDateISO(currentDate));
+    setGroupSessionModalStartTime(sTime || '18:00');
+    setIsCreateGroupSessionOpen(true);
+  };
 
   // Calendar time view range state (Default: 06:00 - 00:00 / 24:00)
   const [startHour, setStartHour] = useState<number>(() => {
@@ -536,7 +544,7 @@ export const CalendarView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Create Group Session Button */}
           <button
-            onClick={() => setIsCreateGroupSessionOpen(true)}
+            onClick={() => handleOpenCreateGroupSession(currentDateStr)}
             className="inline-flex items-center gap-1.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-md shadow-purple-600/20 transition cursor-pointer"
             title={
               'Define a new group session with max capacity'
@@ -1540,7 +1548,7 @@ export const CalendarView: React.FC = () => {
                     <span>{'Group Sessions on this day'} ({dayGroupSessions.length})</span>
                   </h4>
                   <button
-                    onClick={() => setIsCreateGroupSessionOpen(true)}
+                    onClick={() => handleOpenCreateGroupSession(currentDateStr)}
                     className="text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -2076,11 +2084,6 @@ export const CalendarView: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      {client?.customHourlyRate && (
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-200">
-                          Custom Rate: {formatPrice(client.customHourlyRate)}/h
-                        </span>
-                      )}
                     </div>
                     {client?.notes && (
                       <div className="mt-3 rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/60">
@@ -2302,6 +2305,7 @@ export const CalendarView: React.FC = () => {
         onClose={() => setIsAdHocModalOpen(false)}
         initialDateStr={targetAdHocDate}
         initialTab={adHocModalTab}
+        onScheduleGroupSession={(dStr) => handleOpenCreateGroupSession(dStr)}
       />
 
       {/* Google Calendar Direct Touch & Mouse Time Block Modal */}
@@ -2320,6 +2324,7 @@ export const CalendarView: React.FC = () => {
         existingBufferMinutes={timeBlockModalState.existingBufferMinutes}
         isSyntheticWeekly={timeBlockModalState.isSyntheticWeekly}
         onPlanVacation={(dStr) => handleOpenAdHocModal(dStr, 'vacation')}
+        onScheduleGroupSession={(dStr, sTime) => handleOpenCreateGroupSession(dStr, sTime)}
       />
 
       {/* Fixed Weekly Schedule Date-Range Popup Modal */}
@@ -2403,7 +2408,8 @@ export const CalendarView: React.FC = () => {
       <CreateGroupSessionModal
         isOpen={isCreateGroupSessionOpen}
         onClose={() => setIsCreateGroupSessionOpen(false)}
-        initialDate={currentDateStr}
+        initialDate={groupSessionModalDate}
+        initialStartTime={groupSessionModalStartTime}
       />
 
       {/* Group Session Details & Management Modal */}

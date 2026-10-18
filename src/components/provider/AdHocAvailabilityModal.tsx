@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Coffee,
   Palmtree,
+  Users,
 } from 'lucide-react';
 import {
   formatFullHumanDate,
@@ -28,6 +29,7 @@ interface AdHocAvailabilityModalProps {
   onClose: () => void;
   initialDateStr?: string;
   initialTab?: 'availability' | 'vacation';
+  onScheduleGroupSession?: (dateStr: string) => void;
 }
 
 interface BlockDraft {
@@ -45,6 +47,7 @@ export const AdHocAvailabilityModal: React.FC<AdHocAvailabilityModalProps> = ({
   onClose,
   initialDateStr,
   initialTab = 'availability',
+  onScheduleGroupSession,
 }) => {
   const {
     settings,
@@ -428,12 +431,28 @@ export const AdHocAvailabilityModal: React.FC<AdHocAvailabilityModalProps> = ({
                   {formatFullHumanDate(dateStr)}
                 </div>
               </div>
-              <input
-                type="date"
-                value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-emerald-500 transition shadow-2xs"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-emerald-500 transition shadow-2xs"
+                />
+                {onScheduleGroupSession && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onScheduleGroupSession(dateStr);
+                    }}
+                    className="rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold text-xs px-3 py-1.5 flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
+                    title="Plan een groepssessie op deze dag"
+                  >
+                    <Users className="h-3.5 w-3.5 text-purple-600" />
+                    <span>+ Plan Groepssessie</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Quick Presets */}

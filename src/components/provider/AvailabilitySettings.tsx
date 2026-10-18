@@ -30,6 +30,7 @@ import { formatFullHumanDate, formatHumanDate, getTodayISO } from '../../utils/d
 import { AdHocAvailabilityModal } from './AdHocAvailabilityModal';
 import { FixedWeeklyScheduleModal } from './FixedWeeklyScheduleModal';
 import { DataBackupModal } from './DataBackupModal';
+import { InvoiceSettingsView } from '../invoicing/InvoiceSettingsView';
 
 const DAYS_OF_WEEK = [
   { index: 1, label: 'Monday' },
@@ -258,7 +259,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
       bufferMinutes: Number(profileForm.bufferMinutes),
       cancellationPolicyHours: Number(profileForm.cancellationPolicyHours),
       allowUnrestrictedCancellation: profileForm.allowUnrestrictedCancellation,
+      hasSavedSettings: true,
     });
+    try {
+      localStorage.setItem('probooking_settings_configured', 'true');
+    } catch {}
     setSavedBanner(true);
     setTimeout(() => setSavedBanner(false), 3000);
   };
@@ -309,13 +314,20 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
   };
 
   // Service handlers
+  const calculateDefaultServicePrice = (durationMin: number): number => {
+    const hourly = Number(settings.standardHourlyRate) > 0 ? Number(settings.standardHourlyRate) : 65;
+    return Math.round(((hourly * durationMin) / 60) * 100) / 100;
+  };
+
   const handleOpenAddService = () => {
     setEditingService(null);
+    const initialDuration = 60;
+    const initialCalculated = calculateDefaultServicePrice(initialDuration);
     setServiceForm({
       name: '',
-      durationMinutes: 60,
+      durationMinutes: initialDuration,
       description: '',
-      basePrice: settings.standardHourlyRate,
+      basePrice: initialCalculated,
       color: '#2563eb',
     });
     setIsServiceModalOpen(true);
@@ -323,11 +335,15 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
   const handleOpenEditService = (service: ServiceType) => {
     setEditingService(service);
+    const resolvedPrice =
+      typeof service.basePrice === 'number'
+        ? service.basePrice
+        : calculateDefaultServicePrice(service.durationMinutes);
     setServiceForm({
       name: service.name,
       durationMinutes: service.durationMinutes,
       description: service.description,
-      basePrice: service.basePrice || settings.standardHourlyRate,
+      basePrice: resolvedPrice,
       color: service.color,
     });
     setIsServiceModalOpen(true);
@@ -335,22 +351,28 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
   const handleSubmitService = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serviceForm.name) return;
+    if (!serviceForm.name.trim()) return;
+
+    const rawPrice = serviceForm.basePrice;
+    const finalPrice =
+      rawPrice === '' || isNaN(Number(rawPrice))
+        ? 0
+        : Math.max(0, Math.round(Number(rawPrice) * 100) / 100);
 
     if (editingService) {
       updateService(editingService.id, {
-        name: serviceForm.name,
+        name: serviceForm.name.trim(),
         durationMinutes: Number(serviceForm.durationMinutes),
-        description: serviceForm.description,
-        basePrice: Number(serviceForm.basePrice),
+        description: serviceForm.description.trim(),
+        basePrice: finalPrice,
         color: serviceForm.color,
       });
     } else {
       addService({
-        name: serviceForm.name,
+        name: serviceForm.name.trim(),
         durationMinutes: Number(serviceForm.durationMinutes),
-        description: serviceForm.description,
-        basePrice: Number(serviceForm.basePrice),
+        description: serviceForm.description.trim(),
+        basePrice: finalPrice,
         color: serviceForm.color,
       });
     }
@@ -360,8 +382,34 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
 
   
 
+  const isSettingsConfigured =
+    Boolean(settings.hasSavedSettings) ||
+    (typeof window !== 'undefined' && localStorage.getItem('probooking_settings_configured') === 'true');
+
   return (
     <div className="space-y-6">
+      {/* Onboarding Banner for New Users */}
+      {!isSettingsConfigured && (
+        <div className="rounded-3xl border border-amber-300 bg-amber-50/90 p-5 sm:p-6 shadow-md shadow-amber-100/60 flex items-start gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-white shrink-0 shadow-sm">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-black text-amber-950">
+                Configure your settings for a properly working application
+              </h3>
+              <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                New User
+              </span>
+            </div>
+            <p className="text-xs text-amber-900/90 leading-relaxed">
+              For optimal scheduling, bookings, and invoicing, please complete your profile details, standard rate, offered services, and invoice settings below. Once you save your settings, this banner will automatically disappear.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Saved Banner */}
       {savedBanner && (
         <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-bold text-emerald-900 shadow-xs">
@@ -923,7 +971,12 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">{srv.description}</p>
                 <div className="text-xs font-bold text-slate-800 pt-0.5">
-                  {'Default Fee:'} {formatPrice(srv.basePrice || settings.standardHourlyRate)}
+                  {'Rate / Fee:'}{' '}
+                  {typeof srv.basePrice === 'number'
+                    ? srv.basePrice === 0
+                      ? `${formatPrice(0)} (Free)`
+                      : formatPrice(srv.basePrice)
+                    : formatPrice(calculateDefaultServicePrice(srv.durationMinutes))}
                 </div>
               </div>
 
@@ -944,6 +997,11 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Invoice Settings Section (Moved to Settings directly under Offered Service Types) */}
+      <div id="invoice-settings" className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-xl shadow-slate-200/50">
+        <InvoiceSettingsView />
       </div>
 
       {/* Date Exceptions & Blocked Periods (FR-1.3) with Geometric Balance */}
@@ -1147,16 +1205,23 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1.5">
                     {'Duration (Minutes)'}
                   </label>
                   <select
                     value={serviceForm.durationMinutes}
-                    onChange={(e) =>
-                      setServiceForm({ ...serviceForm, durationMinutes: Number(e.target.value) })
-                    }
+                    onChange={(e) => {
+                      const newDuration = Number(e.target.value);
+                      const newCalculated = calculateDefaultServicePrice(newDuration);
+                      setServiceForm({
+                        ...serviceForm,
+                        durationMinutes: newDuration,
+                        // If creating a new service, or if current price equals the previous calculated price, auto-update:
+                        basePrice: !editingService ? newCalculated : serviceForm.basePrice,
+                      });
+                    }}
                     className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition bg-white"
                   >
                     <option value="30">30 min (Express)</option>
@@ -1168,16 +1233,54 @@ export const AvailabilitySettings: React.FC<AvailabilitySettingsProps> = ({ onNa
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1.5">
-                    {`Base Price (${currencySymbol})`}
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-slate-700">
+                      {`Rate per session (${currencySymbol})`}
+                    </label>
+                    <span className="text-[10px] font-medium text-slate-500">
+                      {'Calculated: '}{formatPrice(calculateDefaultServicePrice(serviceForm.durationMinutes))}
+                    </span>
+                  </div>
                   <input
                     type="number"
+                    min="0"
                     step="0.5"
                     value={serviceForm.basePrice}
-                    onChange={(e) => setServiceForm({ ...serviceForm, basePrice: e.target.value })}
-                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition"
+                    onChange={(e) =>
+                      setServiceForm({
+                        ...serviceForm,
+                        basePrice: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-200 p-2.5 text-slate-900 focus:border-emerald-500 outline-none transition font-semibold"
+                    placeholder="0.00"
                   />
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setServiceForm({
+                          ...serviceForm,
+                          basePrice: calculateDefaultServicePrice(serviceForm.durationMinutes),
+                        })
+                      }
+                      className="text-[10px] rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 px-2 py-0.5 text-slate-600 font-medium cursor-pointer transition"
+                    >
+                      {'Use calculated rate (' + formatPrice(calculateDefaultServicePrice(serviceForm.durationMinutes)) + ')'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setServiceForm({
+                          ...serviceForm,
+                          basePrice: 0,
+                        })
+                      }
+                      className="text-[10px] rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 text-emerald-800 font-bold cursor-pointer transition"
+                    >
+                      {'€ 0 (Free session)'}
+                    </button>
+                  </div>
                 </div>
               </div>
 

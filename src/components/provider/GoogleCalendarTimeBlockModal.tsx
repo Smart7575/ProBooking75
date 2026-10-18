@@ -9,6 +9,7 @@ import {
   Info,
   Palmtree,
   Sliders,
+  Users,
 } from 'lucide-react';
 import { formatFullHumanDate, timeToMinutes, endTimeToMinutes, minutesToTime } from '../../utils/dateUtils';
 
@@ -27,6 +28,7 @@ interface GoogleCalendarTimeBlockModalProps {
   existingBufferMinutes?: number;
   isSyntheticWeekly?: boolean;
   onPlanVacation?: (dateStr: string) => void;
+  onScheduleGroupSession?: (dateStr: string, startTime?: string) => void;
 }
 
 export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModalProps> = ({
@@ -44,6 +46,7 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
   existingBufferMinutes,
   isSyntheticWeekly = false,
   onPlanVacation,
+  onScheduleGroupSession,
 }) => {
   const { saveWorkingBlock, removeWorkingBlock, settings } = useBooking();
 
@@ -763,9 +766,32 @@ export const GoogleCalendarTimeBlockModal: React.FC<GoogleCalendarTimeBlockModal
                   onClose();
                   onPlanVacation(dateStr);
                 }}
-                className="shrink-0 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-3 py-1.5 transition shadow-2xs"
+                className="shrink-0 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-3 py-1.5 transition shadow-2xs cursor-pointer"
               >
                 🌴 Plan Vacation
+              </button>
+            </div>
+          )}
+
+          {/* Group Session Scheduling Shortcut */}
+          {onScheduleGroupSession && (
+            <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Users className="h-4 w-4 text-purple-600 shrink-0" />
+                <span className="text-xs font-semibold text-purple-950 truncate">
+                  Groepssessie plannen op {startTime}?
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onScheduleGroupSession(dateStr, startTime);
+                }}
+                className="shrink-0 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] px-3 py-1.5 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>+ Plan Groepssessie</span>
               </button>
             </div>
           )}

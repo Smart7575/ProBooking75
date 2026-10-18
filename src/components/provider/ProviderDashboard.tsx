@@ -17,11 +17,10 @@ import {
   FileText,
   MessageSquare,
   Receipt,
-  LogOut,
   ExternalLink,
+  Settings,
+  AlertCircle,
 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
 import { formatFullHumanDate, isUpcomingBirthday, getTodayISO } from '../../utils/dateUtils';
 import { Appointment } from '../../types';
 
@@ -99,6 +98,10 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
     }
   };
 
+  const isSettingsConfigured =
+    Boolean(settings.hasSavedSettings) ||
+    (typeof window !== 'undefined' && localStorage.getItem('probooking_settings_configured') === 'true');
+
   return (
     <div className="space-y-6">
       {/* Top Welcome Banner styled with Geometric Balance (Slate-900 + Emerald) */}
@@ -122,27 +125,40 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({ onNavigate
             {`You have ${todayAppointments.length} sessions scheduled for today and ${reservedAppts.length} active reservations on your calendar.`}
           </p>
         </div>
+      </div>
 
-        <div className="relative z-10 flex flex-wrap items-center gap-2.5 self-start md:self-center shrink-0">
-          <a
-            href="https://pro-booking75.vercel.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500 hover:border-emerald-400 px-4 py-2.5 text-xs sm:text-sm font-bold text-emerald-300 hover:text-slate-950 shadow-lg shadow-emerald-950/30 transition cursor-pointer"
-          >
-            <ExternalLink className="h-4 w-4 shrink-0" />
-            <span>Open Webapp (browser)</span>
-          </a>
+      {/* Onboarding Notice for New Users (positioned under Welcome back) */}
+      {!isSettingsConfigured && (
+        <div className="rounded-3xl border border-amber-300 bg-linear-to-r from-amber-50 via-orange-50/50 to-amber-50/30 p-5 sm:p-6 shadow-md shadow-amber-100/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-white shrink-0 shadow-md shadow-amber-500/20">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                  Configure your settings first for a properly working application
+                </h3>
+                <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                  New User
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
+                Welcome to ProBooking! For a properly working application, please configure your profile, offered services, and invoice settings first. As soon as you save your settings for the first time, this message will disappear.
+              </p>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => signOut(auth)}
-            className="flex items-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-600 hover:border-rose-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-200 hover:text-white shadow-lg shadow-rose-950/30 transition cursor-pointer"
+            onClick={() => onNavigate('settings')}
+            className="flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition shrink-0 cursor-pointer"
           >
-            <LogOut className="h-4 w-4 shrink-0" />
-            <span>{'Sign Out'}</span>
+            <Settings className="h-4 w-4 text-emerald-400" />
+            <span>Configure Settings</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
-      </div>
+      )}
 
       {/* Unread Chat Messages Notification Banner */}
       {providerUnread > 0 && (
